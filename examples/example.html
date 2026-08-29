@@ -44,13 +44,17 @@
   body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow:hidden; background-color: var(--bg-color); transition: background-color .2s ease; }
   svg.markmap { width:100vw; height:100vh; }
   .markmap-node .markmap-foreign, .markmap-node .markmap-foreign * { color: var(--node-text-color) !important; }
-  .menu-left, .menu-right {
-    position: fixed; top: 20px; z-index: 100; display:flex; flex-wrap:wrap; gap:6px; max-width:44vw;
-    background: var(--menu-bg); padding:8px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.15);
-    border:1px solid var(--menu-border); backdrop-filter: blur(8px); align-items:center;
+  .menu-left {
+    position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; flex-direction: column; gap: 6px; max-width: 48vw;
+    background: var(--menu-bg); padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    border: 1px solid var(--menu-border); backdrop-filter: blur(8px);
   }
-  .menu-left { left:20px; }
-  .menu-right { right:20px; }
+  .menu-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .menu-right {
+    position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; flex-wrap: wrap; gap: 6px; max-width: 46vw;
+    background: var(--menu-bg); padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    border: 1px solid var(--menu-border); backdrop-filter: blur(8px); align-items: center;
+  }
   button, select, input[type="text"] {
     cursor:pointer; padding:6px 10px; border:1px solid var(--btn-border); background: var(--btn-bg);
     border-radius:6px; font-size:12px; font-weight:600; color: var(--text-color); transition: all .15s ease; outline:none;
@@ -73,7 +77,7 @@
     box-shadow:0 4px 14px rgba(0,0,0,0.15); overflow:hidden;
   }
   #minimap svg { width:100%; height:100%; display:block; cursor:pointer; }
-  .mm-viewport { fill: var(--minimap-viewport); stroke: var(--minimap-viewport-border); stroke-width:1.5; }
+  .mm-viewport { fill: none; stroke: var(--minimap-viewport-border); stroke-width:1.5; }
   #tour-bar {
     position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:95; display:none;
     align-items:center; gap:8px; background: var(--menu-bg); padding:6px 10px; border-radius:8px;
@@ -88,6 +92,32 @@
     font-size:12px; color: var(--text-color); box-shadow:0 4px 14px rgba(0,0,0,0.15);
   }
   #tour-note.active { display:block; }
+  
+  /* Tour Principal Focal Node Highlight */
+  .tour-principal-node {
+    background: #fef08a !important;
+    color: #111827 !important;
+    font-weight: 700 !important;
+    border-radius: 6px !important;
+    padding: 3px 10px !important;
+    box-shadow: 0 0 0 2px #eab308, 0 4px 14px rgba(0,0,0,0.18) !important;
+    display: inline-block !important;
+  }
+  .tour-principal-node * {
+    color: #111827 !important;
+    font-weight: 700 !important;
+  }
+  body[data-theme="dark"] .tour-principal-node {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 0 2px #60a5fa, 0 0 18px rgba(37,99,235,0.5) !important;
+  }
+  body[data-theme="dark"] .tour-principal-node * {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+  }
+
   body.animate-links .markmap-link { stroke-dasharray: 4 6; animation: mm-flow 0.6s linear infinite; }
   @keyframes mm-flow { to { stroke-dashoffset: -10; } }
   #hamburger { display:none; }
@@ -110,12 +140,17 @@
 <button id="hamburger" onclick="toggleMobileMenu()">☰</button>
 
 <div class="menu-left" id="menu">
-  <button onclick="window.mm && window.mm.fit()">Fit Window</button>
-  <button id="btn-expand" onclick="expandAll()">Expand All</button>
-  <button id="btn-collapse" onclick="collapseAll()">Collapse All</button>
-  <div class="search-wrap">
-    <input type="text" id="search-input" placeholder="Search... (Ctrl+F)" oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
-    <span class="search-count" id="search-count"></span>
+  <div class="menu-row">
+    <button onclick="window.safeFit()">Fit Window</button>
+    <button id="btn-expand" onclick="expandAll()">Expand All</button>
+    <button id="btn-collapse" onclick="collapseAll()">Collapse All</button>
+    <div class="search-wrap">
+      <input type="text" id="search-input" placeholder="Search... (Ctrl+F)" oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+      <span class="search-count" id="search-count"></span>
+    </div>
+  </div>
+  <div class="menu-row" id="levels-container">
+    <!-- Level 1..N buttons placed on line 2 -->
   </div>
 </div>
 
@@ -130,12 +165,12 @@
   <button onclick="toggleTheme()" id="btn-theme" title="Toggle dark mode">🌙 Dark</button>
   <button onclick="toggleLinkAnimation()" id="btn-flow" title="Decorative animated flow along branches (visual only, not a data-flow direction)">〰️ Animate</button>
   <button onclick="exportSVG()" title="Export current map as SVG">⬇ SVG</button>
-  <button onclick="exportShareCard()" title="Export a 1200x630 share card PNG for LinkedIn/README">🖼️ Share Card</button>
+  <button onclick="exportPNG()" title="Export high-resolution PNG image">🖼️ PNG</button>
   <button onclick="toggleMinimap()" id="btn-minimap" title="Show/hide minimap">🗺️ Map</button>
   <button onclick="toggleTour()" id="btn-tour" title="Guided tour through authored views">🧭 Tour</button>
 </div>
 
-<div id="version-badge">syd-markmap-forge · Exhaustive · 2026-08-29</div>
+<div id="version-badge">syd-markmap-forge · 2026-08-29</div>
 
 <div id="minimap"><svg id="minimap-svg" viewBox="0 0 180 130"></svg></div>
 
@@ -165,7 +200,6 @@ const markdown = `
 ### Typed input
 - **schema_version**: fixed at 1
 - **source_name**: human-readable title of the original document
-- **variant**: exhaustive or light
 - **generation_date**: authored explicitly, never resolved implicitly, so a delivered artifact is reproducible from its JSON source
 - **markdown**: the sanitized outline, using heading levels for pillars and entities and bullets for detail
 - **views**: an optional guided tour, ordered stops that each center on the nodes matched by a focus list
@@ -194,12 +228,12 @@ const markdown = `
 - One expand button per detected heading depth
 ### Borrowed from archify
 - Guided tour: authored stops with Prev/Next and a caption, replaying a scripted narrative instead of manual clicking
-- Share Card export: a fixed 1200x630 PNG suited for LinkedIn or a README, distinct from the raw SVG export
+- PNG export: a full-resolution, high-DPI (2x) raster of the whole map, distinct from the raw SVG export
 - Decorative animated links: a subtle flowing dash along branches, purely visual, not a data-flow direction
 
 `;
 
-const views = [{"id":"problem","label":"The problem","focus":["Prior approach","one-shot prompt"],"note":"A one-shot prompt had no enforced correctness guarantee on a 500-line verbatim template."},{"id":"fix","label":"What changed","focus":["static asset, injected by deterministic code"],"note":"The template became a static asset; the agent authors only a small typed JSON object."},{"id":"borrowed","label":"Borrowed from archify","focus":["Guided tour","Share Card export","animated links"],"note":"Three ideas ported from archify: a guided tour, a share card export, and decorative animated links."}];
+const views = [{"id":"problem","label":"The problem","focus":["Prior approach","one-shot prompt"],"note":"A one-shot prompt had no enforced correctness guarantee on a 500-line verbatim template."},{"id":"fix","label":"What changed","focus":["static asset, injected by deterministic code"],"note":"The template became a static asset; the agent authors only a small typed JSON object."},{"id":"borrowed","label":"Borrowed from archify","focus":["Guided tour","PNG export","animated links"],"note":"Three ideas ported from archify: a guided tour, a PNG export, and decorative animated links."}];
 
 const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
 const transformer = new Transformer();
@@ -221,21 +255,87 @@ let tourIndex = -1;
 
 window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400 }, root);
 
-function walk(node, fn, depth = 1) {
-    fn(node, depth);
-    if (node.children) node.children.forEach(child => walk(child, fn, depth + 1));
+// After a fit, the tree can render directly underneath the floating menu panels or the
+// minimap (all position:fixed, with no built-in collision avoidance). Nudge the pan so the
+// topmost node clears the menus, and so no node sits behind the minimap corner.
+function adjustForOverlap() {
+    try {
+        const svg = document.getElementById('markmap');
+        const menuLeft = document.querySelector('.menu-left').getBoundingClientRect();
+        const menuRight = document.querySelector('.menu-right').getBoundingClientRect();
+        const minimapEl = document.getElementById('minimap');
+        const minimapRect = (minimapEl.style.display !== 'none') ? minimapEl.getBoundingClientRect() : null;
+        const nodeEls = Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign'));
+        if (!nodeEls.length) return;
+
+        const rects = nodeEls.map(el => el.getBoundingClientRect());
+        const reservedTop = Math.max(menuLeft.bottom, menuRight.bottom) + 16;
+        const topMost = Math.min(...rects.map(r => r.top));
+        let dy = topMost < reservedTop ? reservedTop - topMost : 0;
+
+        let dx = 0;
+        if (minimapRect) {
+            const overlapsMinimap = rects.some(r =>
+                !(r.right < minimapRect.left || r.left > minimapRect.right || r.bottom < minimapRect.top || r.top > minimapRect.bottom)
+            );
+            if (overlapsMinimap) dx = -(minimapRect.width * 0.6 + 16);
+        }
+
+        if (dx || dy) {
+            const transform = d3.zoomTransform(svg);
+            const newTransform = d3.zoomIdentity.translate(transform.x + dx, transform.y + dy).scale(transform.k);
+            d3.select(svg).call(window.mm.zoom.transform, newTransform);
+        }
+    } catch (e) { /* non-critical */ }
+}
+window.safeFit = function() {
+    const svg = document.getElementById('markmap');
+    const before = d3.zoomTransform(svg);
+    const beforeKey = before.x.toFixed(2) + ',' + before.y.toFixed(2) + ',' + before.k.toFixed(4);
+    window.mm.fit();
+    // markmap's fit() animates the pan/zoom over an unknown duration, starting on its own next
+    // frame/tick. Sampling the transform mid-transition (or before it has even started, which
+    // looks just as "stable") would compute the overlap nudge from a stale position. Poll until
+    // the transform has actually moved away from its pre-fit value, then stops changing for a
+    // few consecutive frames, before correcting it once, fully settled.
+    let lastKey = beforeKey, stableFrames = 0, totalFrames = 0, hasMoved = false;
+    function poll() {
+        const t = d3.zoomTransform(svg);
+        const key = t.x.toFixed(2) + ',' + t.y.toFixed(2) + ',' + t.k.toFixed(4);
+        if (key !== beforeKey) hasMoved = true;
+        stableFrames = (key === lastKey) ? stableFrames + 1 : 0;
+        lastKey = key;
+        totalFrames++;
+        if ((hasMoved && stableFrames >= 4) || totalFrames > 90) {
+            adjustForOverlap();
+            return;
+        }
+        requestAnimationFrame(poll);
+    }
+    requestAnimationFrame(poll);
+};
+
+function assignDepths(node, depth = 0) {
+    node._treeDepth = depth;
+    if (node.children) node.children.forEach(c => assignDepths(c, depth + 1));
+}
+assignDepths(root, 0);
+
+function walk(node, fn) {
+    fn(node, node._treeDepth || 0);
+    if (node.children) node.children.forEach(child => walk(child, fn));
 }
 
 let maxDepth = 0;
 walk(root, (n, depth) => { if (depth > maxDepth) maxDepth = depth; });
 
-const menu = document.getElementById('menu');
+const levelsContainer = document.getElementById('levels-container');
 for (let i = 1; i <= maxDepth; i++) {
     const btn = document.createElement('button');
     btn.textContent = 'Level ' + i;
     btn.id = 'btn-lvl-' + i;
     btn.onclick = () => expandTo(i);
-    menu.appendChild(btn);
+    levelsContainer.appendChild(btn);
 }
 
 function updateActiveButton(activeId) {
@@ -285,6 +385,10 @@ window.togglePitchMode = function() {
     btn.classList.toggle('active', isPitchMode);
     if (isPitchMode) {
         btn.textContent = '📺 Pitch Mode: ON';
+        if (!autoFitEnabled) {
+            window.toggleAutoFit();
+        }
+        window.safeFit();
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {});
         }
@@ -299,7 +403,7 @@ window.togglePitchMode = function() {
 window.changeNodeWidth = function(widthVal) {
     window.mm.setOptions({ maxWidth: parseInt(widthVal, 10) });
     window.mm.setData(root);
-    window.mm.fit();
+    window.safeFit();
     saveState();
 };
 
@@ -310,12 +414,81 @@ window.toggleLinkAnimation = function() {
     saveState();
 };
 
-function findFocusElements(focusList) {
-    const all = Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div'));
-    const needles = focusList.map(f => f.toLowerCase());
-    return all.filter(el => {
-        const text = el.textContent.toLowerCase();
-        return needles.some(n => text.includes(n));
+function applyTourSelectiveFolding(rootNode, primaryNeedle, relDepthLimit = 2) {
+    const needle = primaryNeedle.toLowerCase();
+    
+    // 1. Find the exact primary focal node
+    let focalNode = null;
+    function findFocal(n) {
+        const text = (n.content || '').replace(/<[^>]+>/g, '').toLowerCase();
+        if (text.includes(needle) && !focalNode) {
+            focalNode = n;
+            return;
+        }
+        if (n.children) n.children.forEach(findFocal);
+    }
+    findFocal(rootNode);
+    if (!focalNode) focalNode = rootNode;
+
+    const focalDepth = focalNode._treeDepth || 0;
+    const maxAllowedDepth = focalDepth + relDepthLimit;
+
+    // 2. Mark ancestors on path from root to focalNode
+    function markAncestors(n) {
+        if (n === focalNode) return true;
+        let onPath = false;
+        if (n.children) {
+            n.children.forEach(c => {
+                if (markAncestors(c)) onPath = true;
+            });
+        }
+        n._isAncestor = onPath;
+        return onPath;
+    }
+    markAncestors(rootNode);
+
+    // 3. Apply fold: unfold path, unfold descendants up to N+2, fold everything else
+    function applyFold(n, insideFocal = false) {
+        const isFocal = (n === focalNode);
+        const inFocalSubtree = insideFocal || isFocal;
+
+        n._isPrincipal = isFocal;
+
+        if (n === rootNode || n._isAncestor) {
+            n.payload = { ...n.payload, fold: 0 };
+        } else if (inFocalSubtree) {
+            n.payload = { ...n.payload, fold: (n._treeDepth < maxAllowedDepth) ? 0 : 1 };
+        } else {
+            n.payload = { ...n.payload, fold: 1 };
+        }
+
+        if (n.children) {
+            n.children.forEach(c => applyFold(c, inFocalSubtree));
+        }
+    }
+    applyFold(rootNode, false);
+
+    return focalNode;
+}
+
+function clearTourSpotlights() {
+    document.querySelectorAll('.tour-principal-node').forEach(el => el.classList.remove('tour-principal-node'));
+}
+
+function applyPrincipalHighlight(primaryNeedle) {
+    const needle = primaryNeedle.toLowerCase();
+    const allGroups = Array.from(document.querySelectorAll('#markmap g.markmap-node'));
+    let matched = false;
+    allGroups.forEach(group => {
+        if (matched) return;
+        const text = group.textContent.toLowerCase();
+        if (text.includes(needle)) {
+            const div = group.querySelector('.markmap-foreign > div');
+            if (div) {
+                div.classList.add('tour-principal-node');
+                matched = true;
+            }
+        }
     });
 }
 
@@ -323,152 +496,142 @@ function goToViewIndex(i) {
     if (!views.length) return;
     tourIndex = ((i % views.length) + views.length) % views.length;
     const view = views[tourIndex];
-    walk(root, n => { n.payload = { ...n.payload, fold: 0 }; });
+    
+    // Primary focal term for this tour stop
+    const primaryFocus = (view.focus && view.focus.length > 0) ? view.focus[0] : view.label;
+    
+    // Selective smart folding: unfold path, unfold down to N+2, collapse all other branches
+    applyTourSelectiveFolding(root, primaryFocus, 2);
     window.mm.setData(root);
+    
     document.getElementById('tour-label').textContent = view.label;
     document.getElementById('tour-index').textContent = (tourIndex + 1) + '/' + views.length;
     const noteEl = document.getElementById('tour-note');
     noteEl.textContent = view.note || '';
     noteEl.classList.toggle('active', tourActive && !!view.note);
+    
     setTimeout(() => {
-        const els = findFocusElements(view.focus);
-        if (els.length) centerOnElements(els);
-    }, 250);
+        window.safeFit();
+        clearTourSpotlights();
+        applyPrincipalHighlight(primaryFocus);
+    }, 150);
+    setTimeout(() => {
+        window.safeFit();
+        clearTourSpotlights();
+        applyPrincipalHighlight(primaryFocus);
+    }, 450);
 }
+
 window.toggleTour = function() {
     if (!views.length) return;
     tourActive = !tourActive;
+    document.body.classList.toggle('tour-active', tourActive);
     document.getElementById('btn-tour').classList.toggle('active', tourActive);
     document.getElementById('tour-bar').classList.toggle('active', tourActive);
     if (tourActive) {
         goToViewIndex(tourIndex >= 0 ? tourIndex : 0);
     } else {
+        clearTourSpotlights();
         document.getElementById('tour-note').classList.remove('active');
+        expandTo(currentLevel);
+        setTimeout(() => { window.safeFit(); }, 200);
     }
 };
 window.tourNext = function() { goToViewIndex(tourIndex + 1); };
 window.tourPrev = function() { goToViewIndex(tourIndex - 1); };
 window.closeTour = function() { if (tourActive) window.toggleTour(); };
 
-function buildRasterSafeSVG() {
-    // Canvas export of an SVG containing <foreignObject> HTML (markmap's node text)
-    // taints the canvas in Chrome even for same-origin content. Swap each
-    // foreignObject for a plain <text> element so the clone is canvas-safe.
-    const svgEl = document.getElementById('markmap');
-    const clone = svgEl.cloneNode(true);
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
-    clone.style.background = bg;
-    const textColor = getComputedStyle(document.body).getPropertyValue('--node-text-color').trim() || '#000000';
-    const ns = 'http://www.w3.org/2000/svg';
-    clone.querySelectorAll('foreignObject').forEach(fo => {
-        const div = fo.querySelector('div');
-        const text = div ? div.textContent : '';
-        const x = parseFloat(fo.getAttribute('x') || '0');
-        const y = parseFloat(fo.getAttribute('y') || '0');
-        const h = parseFloat(fo.getAttribute('height') || '20');
-        const textEl = document.createElementNS(ns, 'text');
-        textEl.setAttribute('x', x + 4);
-        textEl.setAttribute('y', y + h / 2 + 5);
-        textEl.setAttribute('font-size', '14');
-        textEl.setAttribute('font-family', '-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif');
-        textEl.setAttribute('fill', textColor);
-        textEl.textContent = text;
-        fo.parentNode.replaceChild(textEl, fo);
-    });
-    return new XMLSerializer().serializeToString(clone);
-}
-
-window.exportShareCard = function() {
+window.exportPNG = function() {
     try {
-        const svgStr = buildRasterSafeSVG();
+        const svgEl = document.getElementById('markmap');
+        const gEl = svgEl.querySelector('g');
+        if (!gEl) return;
+        const bbox = gEl.getBBox();
+        const pad = 50;
+        const x = bbox.x - pad;
+        const y = bbox.y - pad;
+        const w = Math.max(bbox.width + pad * 2, 300);
+        const h = Math.max(bbox.height + pad * 2, 300);
+
+        const clone = svgEl.cloneNode(true);
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clone.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+        clone.setAttribute('width', w);
+        clone.setAttribute('height', h);
+        
+        const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
+        clone.style.background = bg;
+        const textColor = getComputedStyle(document.body).getPropertyValue('--node-text-color').trim() || '#000000';
+        const ns = 'http://www.w3.org/2000/svg';
+        
+        clone.querySelectorAll('foreignObject').forEach(fo => {
+            const div = fo.querySelector('div');
+            const text = div ? div.textContent : '';
+            const fx = parseFloat(fo.getAttribute('x') || '0');
+            const fy = parseFloat(fo.getAttribute('y') || '0');
+            const fh = parseFloat(fo.getAttribute('height') || '20');
+            const textEl = document.createElementNS(ns, 'text');
+            textEl.setAttribute('x', fx + 4);
+            textEl.setAttribute('y', fy + fh / 2 + 5);
+            textEl.setAttribute('font-size', '14');
+            textEl.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+            textEl.setAttribute('fill', textColor);
+            textEl.textContent = text;
+            fo.parentNode.replaceChild(textEl, fo);
+        });
+
+        const cloneG = clone.querySelector('g');
+        if (cloneG) {
+            cloneG.removeAttribute('transform');
+        }
+
+        const svgStr = new XMLSerializer().serializeToString(clone);
         const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
         const img = new Image();
         img.onload = function() {
             try {
-                const cw = 1200, ch = 630, pad = 48;
+                const scale = 2;
                 const canvas = document.createElement('canvas');
-                canvas.width = cw; canvas.height = ch;
+                canvas.width = Math.round(w * scale);
+                canvas.height = Math.round(h * scale);
                 const ctx = canvas.getContext('2d');
-                const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
-                ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
-                const availW = cw - pad * 2, availH = ch - pad * 2 - 28;
-                const scale = Math.min(availW / img.width, availH / img.height, 1);
-                const dw = img.width * scale, dh = img.height * scale;
-                const dx = (cw - dw) / 2, dy = pad + (availH - dh) / 2;
-                ctx.drawImage(img, dx, dy, dw, dh);
-                ctx.font = '600 13px -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-                ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--badge-color').trim() || '#6a737d';
-                ctx.textAlign = 'center';
-                ctx.fillText(document.getElementById('version-badge').textContent, cw / 2, ch - 20);
+                ctx.scale(scale, scale);
+                ctx.fillStyle = bg;
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
                 canvas.toBlob(function(blob) {
                     if (!blob) return;
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(blob);
-                    a.download = (document.title || 'mindmap').replace(/\s+/g, '_') + '_share.png';
-                    document.body.appendChild(a); a.click(); a.remove();
+                    a.download = (document.title || 'mindmap').replace(/\s+/g, '_') + '.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
                 }, 'image/png');
-            } catch (e) { console.error('Share card export failed while drawing', e); }
-            finally { URL.revokeObjectURL(url); }
+            } catch (err) {
+                console.error('PNG export drawing failed', err);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
         };
-        img.onerror = function() { console.error('Share card export failed: could not rasterize SVG'); URL.revokeObjectURL(url); };
+        img.onerror = function() {
+            console.error('PNG rasterization failed');
+            URL.revokeObjectURL(url);
+        };
         img.src = url;
-    } catch (e) { console.error('Share card export failed', e); }
+    } catch (e) {
+        console.error('PNG export failed', e);
+    }
 };
 
 document.getElementById('markmap').addEventListener('click', (e) => {
     const nodeGroup = e.target.closest('g.markmap-node');
     if (!nodeGroup) return;
     if (isPitchMode) {
-        setTimeout(() => { centerOnElements([nodeGroup], true); }, 200);
+        setTimeout(() => { window.safeFit(); }, 250);
     }
 });
-
-function centerOnElements(elements, useChildrenOfFirst) {
-    try {
-        const svgEl = document.getElementById('markmap');
-        let targetElements = elements;
-        if (useChildrenOfFirst) {
-            const parentGroup = elements[0];
-            const allNodes = Array.from(svgEl.querySelectorAll('g.markmap-node'));
-            const parentCircle = parentGroup.querySelector('circle');
-            if (parentCircle) {
-                const parentCtm = parentCircle.getScreenCTM();
-                if (parentCtm) {
-                    const childNodes = allNodes.filter(n => {
-                        const c = n.querySelector('circle');
-                        if (!c || n === parentGroup) return false;
-                        const ctm = c.getScreenCTM();
-                        return ctm && ctm.e > parentCtm.e + 10 && Math.abs(ctm.f - parentCtm.f) < 600;
-                    });
-                    targetElements = childNodes.length > 0 ? childNodes : [parentGroup];
-                }
-            }
-        }
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        targetElements.forEach(el => {
-            const rect = el.getBoundingClientRect();
-            if (rect.left < minX) minX = rect.left;
-            if (rect.right > maxX) maxX = rect.right;
-            if (rect.top < minY) minY = rect.top;
-            if (rect.bottom > maxY) maxY = rect.bottom;
-        });
-        const padding = 30;
-        minX -= padding; maxX += padding; minY -= padding; maxY += padding;
-        const bboxCenterX = (minX + maxX) / 2;
-        const bboxCenterY = (minY + maxY) / 2;
-        const screenCenterX = window.innerWidth * 0.5;
-        const screenCenterY = window.innerHeight * 0.5;
-        const dx = screenCenterX - bboxCenterX;
-        const dy = screenCenterY - bboxCenterY;
-        const transform = d3.zoomTransform(svgEl);
-        const newX = transform.x + dx;
-        const newY = transform.y + dy;
-        d3.select(svgEl).transition().duration(650)
-          .call(window.mm.zoom.transform, d3.zoomIdentity.translate(newX, newY).scale(transform.k));
-    } catch (e) { /* non-critical */ }
-}
 
 function applyTheme(theme) {
     document.body.setAttribute('data-theme', theme);
@@ -490,7 +653,7 @@ function saveState() {
             autoFit: autoFitEnabled,
             flow: linkAnimation
         }));
-    } catch (e) { /* localStorage unavailable, skip persistence */ }
+    } catch (e) { /* skip persistence */ }
 }
 function loadState() {
     try {
@@ -540,7 +703,7 @@ window.onSearchInput = function() {
         searchIndex = searchMatches.length ? 0 : -1;
         searchMatches.forEach(el => el.classList.add('search-match'));
         countEl.textContent = searchMatches.length ? '1/' + searchMatches.length : '0/0';
-        if (searchMatches.length) centerOnElements([searchMatches[0]]);
+        if (searchMatches.length) window.safeFit();
     }, 250);
 };
 window.onSearchKeydown = function(e) {
@@ -556,7 +719,7 @@ window.onSearchKeydown = function(e) {
         ? (searchIndex - 1 + searchMatches.length) % searchMatches.length
         : (searchIndex + 1) % searchMatches.length;
     document.getElementById('search-count').textContent = (searchIndex + 1) + '/' + searchMatches.length;
-    centerOnElements([searchMatches[searchIndex]]);
+    window.safeFit();
 };
 
 function getSerializedSVG() {
@@ -606,11 +769,26 @@ function renderMinimap() {
         mmSvg.setAttribute('viewBox', minX + ' ' + minY + ' ' + w + ' ' + h);
         const ns = 'http://www.w3.org/2000/svg';
         const accent = getComputedStyle(document.body).getPropertyValue('--btn-active-bg').trim() || '#0366d6';
+
+        // Tree silhouette first (links, then node dots) so the viewport rect never paints over the thumbnail.
+        const linkGroup = document.createElementNS(ns, 'g');
+        linkGroup.setAttribute('fill', 'none');
+        linkGroup.setAttribute('stroke', accent);
+        linkGroup.setAttribute('stroke-opacity', '0.45');
+        linkGroup.setAttribute('stroke-width', String(Math.max(w, h) / 300));
+        document.querySelectorAll('#markmap path.markmap-link').forEach(p => {
+            const d = p.getAttribute('d');
+            if (!d) return;
+            const clone = document.createElementNS(ns, 'path');
+            clone.setAttribute('d', d);
+            linkGroup.appendChild(clone);
+        });
+        mmSvg.appendChild(linkGroup);
         points.forEach(p => {
             const c = document.createElementNS(ns, 'circle');
             c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]);
             c.setAttribute('r', Math.max(w, h) / 220);
-            c.setAttribute('fill', accent); c.setAttribute('opacity', '0.55');
+            c.setAttribute('fill', accent); c.setAttribute('opacity', '0.7');
             mmSvg.appendChild(c);
         });
         const mainSvg = document.getElementById('markmap');
@@ -624,7 +802,7 @@ function renderMinimap() {
         rectEl.setAttribute('width', vw); rectEl.setAttribute('height', vh);
         rectEl.setAttribute('class', 'mm-viewport');
         mmSvg.appendChild(rectEl);
-    } catch (e) { /* minimap is a non-critical enhancement */ }
+    } catch (e) { /* non-critical */ }
 }
 document.getElementById('minimap-svg').addEventListener('click', function(e) {
     try {
@@ -669,7 +847,7 @@ if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
 if (savedState && savedState.flow) { window.toggleLinkAnimation(); }
 if (!views.length) { document.getElementById('btn-tour').style.display = 'none'; }
 expandTo(savedState && savedState.level ? savedState.level : 2);
-window.mm.fit();
+window.safeFit();
 setTimeout(renderMinimap, 300);
 </script>
 </body>

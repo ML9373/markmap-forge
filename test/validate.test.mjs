@@ -5,7 +5,6 @@ import { validateMindmap } from "../lib/validate.mjs";
 const base = {
 	schema_version: 1,
 	source_name: "Test Doc",
-	variant: "exhaustive",
 	generation_date: "2026-08-29",
 };
 
@@ -46,7 +45,7 @@ test("backtick triggers a warning, not a failure", () => {
 });
 
 test("schema violation is rejected", () => {
-	const result = validateMindmap({ ...base, variant: "bogus", markdown: "# Title\n" });
+	const result = validateMindmap({ ...base, schema_version: 2, markdown: "# Title\n" });
 	assert.equal(result.ok, false);
 	assert.ok(result.diagnostics.some((d) => d.code === "schema"));
 });
