@@ -1,2 +1,9 @@
 node_modules/
 .DS_Store
+
+# Only the tool's own generic dogfooding example is published on GitHub.
+# Mouiz's real-content deliverables (personal/business, sometimes AVEVA IP)
+# stay local to this clone and are copied into the vault's 4.htmls instead.
+examples/*
+!examples/example.mindmap.json
+!examples/example.html
