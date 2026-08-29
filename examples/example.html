@@ -414,6 +414,9 @@ window.toggleLinkAnimation = function() {
     saveState();
 };
 
+// relDepthLimit is relative to the focal node's own depth, not absolute from root — it's driven
+// by currentLevel (whichever "Level N" menu button is active) so the tour respects the user's
+// chosen detail level instead of a hardcoded offset.
 function applyTourSelectiveFolding(rootNode, primaryNeedle, relDepthLimit = 2) {
     const needle = primaryNeedle.toLowerCase();
     
@@ -500,8 +503,10 @@ function goToViewIndex(i) {
     // Primary focal term for this tour stop
     const primaryFocus = (view.focus && view.focus.length > 0) ? view.focus[0] : view.label;
     
-    // Selective smart folding: unfold path, unfold down to N+2, collapse all other branches
-    applyTourSelectiveFolding(root, primaryFocus, 2);
+    // Selective smart folding: unfold path, unfold down to N + currentLevel (whatever depth is
+    // currently checked in the Level 1..N menu, so the tour respects the user's own detail
+    // setting instead of a fixed offset), collapse all other branches.
+    applyTourSelectiveFolding(root, primaryFocus, currentLevel);
     window.mm.setData(root);
     
     document.getElementById('tour-label').textContent = view.label;
