@@ -33,6 +33,7 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
      "markdown": "# Title\n## Pillar\n### Entity\n- detail\n"
    }
    ```
+   Optionally add `views` — an authored guided tour (ported from archify's views/focus concept), an ordered array of `{ id, label, focus: [string, ...], note }`. Only add a view when the user wants a scripted walkthrough (e.g. for a live pitch); most documents don't need one. Every `focus` string must be a substring that genuinely appears in `markdown` — never invent a tour stop pointing at content that isn't there, the validator rejects it anyway.
 5. Validate:
    ```bash
    node bin/syd-markmap-forge.mjs validate candidate.mindmap.json --json

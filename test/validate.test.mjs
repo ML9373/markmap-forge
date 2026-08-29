@@ -50,3 +50,35 @@ test("schema violation is rejected", () => {
 	assert.equal(result.ok, false);
 	assert.ok(result.diagnostics.some((d) => d.code === "schema"));
 });
+
+test("a grounded view passes", () => {
+	const result = validateMindmap({
+		...base,
+		markdown: "# Title\n## Pillar\n- detail about widgets\n",
+		views: [{ id: "v1", label: "Widgets", focus: ["widgets"], note: "n" }],
+	});
+	assert.equal(result.ok, true);
+});
+
+test("an ungrounded view focus is rejected", () => {
+	const result = validateMindmap({
+		...base,
+		markdown: "# Title\n## Pillar\n- detail about widgets\n",
+		views: [{ id: "v1", label: "Gadgets", focus: ["gadgets"], note: "n" }],
+	});
+	assert.equal(result.ok, false);
+	assert.ok(result.diagnostics.some((d) => d.code === "views/ungrounded-focus"));
+});
+
+test("a duplicate view id is rejected", () => {
+	const result = validateMindmap({
+		...base,
+		markdown: "# Title\n## Pillar\n- widgets and gadgets\n",
+		views: [
+			{ id: "v1", label: "A", focus: ["widgets"], note: "n" },
+			{ id: "v1", label: "B", focus: ["gadgets"], note: "n" },
+		],
+	});
+	assert.equal(result.ok, false);
+	assert.ok(result.diagnostics.some((d) => d.code === "views/duplicate-id"));
+});

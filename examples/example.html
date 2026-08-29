@@ -74,6 +74,22 @@
   }
   #minimap svg { width:100%; height:100%; display:block; cursor:pointer; }
   .mm-viewport { fill: var(--minimap-viewport); stroke: var(--minimap-viewport-border); stroke-width:1.5; }
+  #tour-bar {
+    position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:95; display:none;
+    align-items:center; gap:8px; background: var(--menu-bg); padding:6px 10px; border-radius:8px;
+    border:1px solid var(--menu-border); box-shadow:0 4px 14px rgba(0,0,0,0.15); backdrop-filter: blur(8px);
+  }
+  #tour-bar.active { display:flex; }
+  #tour-label { font-size:12px; font-weight:600; color: var(--text-color); max-width:36vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tour-index { font-size:11px; color: var(--badge-color); min-width:32px; text-align:center; }
+  #tour-note {
+    position:fixed; bottom:54px; left:50%; transform:translateX(-50%); z-index:95; display:none;
+    max-width:56vw; background: var(--menu-bg); padding:8px 12px; border-radius:8px; border:1px solid var(--menu-border);
+    font-size:12px; color: var(--text-color); box-shadow:0 4px 14px rgba(0,0,0,0.15);
+  }
+  #tour-note.active { display:block; }
+  body.animate-links .markmap-link { stroke-dasharray: 4 6; animation: mm-flow 0.6s linear infinite; }
+  @keyframes mm-flow { to { stroke-dashoffset: -10; } }
   #hamburger { display:none; }
   @media (max-width: 700px) {
     .menu-left, .menu-right { display:none; max-width: 92vw; }
@@ -82,6 +98,7 @@
     .menu-right.mobile-open { top:auto; bottom:20px; right:20px; }
     #hamburger { display:block; position:fixed; top:20px; right:20px; z-index:110; font-size:16px; padding:8px 12px; }
     #minimap { display:none; }
+    #tour-bar, #tour-note { display:none !important; }
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -111,13 +128,25 @@
     <option value="600">Width: 600px</option>
   </select>
   <button onclick="toggleTheme()" id="btn-theme" title="Toggle dark mode">🌙 Dark</button>
+  <button onclick="toggleLinkAnimation()" id="btn-flow" title="Decorative animated flow along branches (visual only, not a data-flow direction)">〰️ Animate</button>
   <button onclick="exportSVG()" title="Export current map as SVG">⬇ SVG</button>
+  <button onclick="exportShareCard()" title="Export a 1200x630 share card PNG for LinkedIn/README">🖼️ Share Card</button>
   <button onclick="toggleMinimap()" id="btn-minimap" title="Show/hide minimap">🗺️ Map</button>
+  <button onclick="toggleTour()" id="btn-tour" title="Guided tour through authored views">🧭 Tour</button>
 </div>
 
 <div id="version-badge">syd-markmap-forge · Exhaustive · 2026-08-29</div>
 
 <div id="minimap"><svg id="minimap-svg" viewBox="0 0 180 130"></svg></div>
+
+<div id="tour-note"></div>
+<div id="tour-bar">
+  <button onclick="tourPrev()" title="Previous stop">‹</button>
+  <span id="tour-label"></span>
+  <span id="tour-index"></span>
+  <button onclick="tourNext()" title="Next stop">›</button>
+  <button onclick="closeTour()" title="Close tour">✕</button>
+</div>
 
 <svg class="markmap" id="markmap"></svg>
 
@@ -139,8 +168,9 @@ const markdown = `
 - **variant**: exhaustive or light
 - **generation_date**: authored explicitly, never resolved implicitly, so a delivered artifact is reproducible from its JSON source
 - **markdown**: the sanitized outline, using heading levels for pillars and entities and bullets for detail
+- **views**: an optional guided tour, ordered stops that each center on the nodes matched by a focus list
 ### Deterministic pipeline
-- **validate**: schema shape plus markdown structural rules
+- **validate**: schema shape plus markdown structural rules, plus checking every guided tour focus term against the markdown
 - **render**: injects the validated content into the fixed template
 - **deliver**: validates, renders, and reports a SHA-256 receipt for both the JSON source and the HTML artifact
 ## Validation rules
@@ -151,6 +181,9 @@ const markdown = `
 ### Safety
 - Stray arrows and pipe glyphs are rejected
 - Backticks and dollar-brace sequences are auto-escaped before they reach the embedded script
+### Guided tour
+- Every focus term must be grounded in the markdown, borrowed from archify's own views/focus concept
+- A duplicate view id is rejected
 ## Output features
 ### Inherited from the original template
 - Live search with match count and Ctrl+F
@@ -159,8 +192,14 @@ const markdown = `
 - SVG export
 - Pitch mode with fullscreen focus-and-zoom
 - One expand button per detected heading depth
+### Borrowed from archify
+- Guided tour: authored stops with Prev/Next and a caption, replaying a scripted narrative instead of manual clicking
+- Share Card export: a fixed 1200x630 PNG suited for LinkedIn or a README, distinct from the raw SVG export
+- Decorative animated links: a subtle flowing dash along branches, purely visual, not a data-flow direction
 
 `;
+
+const views = [{"id":"problem","label":"The problem","focus":["Prior approach","one-shot prompt"],"note":"A one-shot prompt had no enforced correctness guarantee on a 500-line verbatim template."},{"id":"fix","label":"What changed","focus":["static asset, injected by deterministic code"],"note":"The template became a static asset; the agent authors only a small typed JSON object."},{"id":"borrowed","label":"Borrowed from archify","focus":["Guided tour","Share Card export","animated links"],"note":"Three ideas ported from archify: a guided tour, a share card export, and decorative animated links."}];
 
 const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
 const transformer = new Transformer();
@@ -176,6 +215,9 @@ let currentLevel = 2;
 let minimapVisible = true;
 let searchMatches = [];
 let searchIndex = -1;
+let linkAnimation = false;
+let tourActive = false;
+let tourIndex = -1;
 
 window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400 }, root);
 
@@ -261,6 +303,120 @@ window.changeNodeWidth = function(widthVal) {
     saveState();
 };
 
+window.toggleLinkAnimation = function() {
+    linkAnimation = !linkAnimation;
+    document.body.classList.toggle('animate-links', linkAnimation);
+    document.getElementById('btn-flow').classList.toggle('active', linkAnimation);
+    saveState();
+};
+
+function findFocusElements(focusList) {
+    const all = Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div'));
+    const needles = focusList.map(f => f.toLowerCase());
+    return all.filter(el => {
+        const text = el.textContent.toLowerCase();
+        return needles.some(n => text.includes(n));
+    });
+}
+
+function goToViewIndex(i) {
+    if (!views.length) return;
+    tourIndex = ((i % views.length) + views.length) % views.length;
+    const view = views[tourIndex];
+    walk(root, n => { n.payload = { ...n.payload, fold: 0 }; });
+    window.mm.setData(root);
+    document.getElementById('tour-label').textContent = view.label;
+    document.getElementById('tour-index').textContent = (tourIndex + 1) + '/' + views.length;
+    const noteEl = document.getElementById('tour-note');
+    noteEl.textContent = view.note || '';
+    noteEl.classList.toggle('active', tourActive && !!view.note);
+    setTimeout(() => {
+        const els = findFocusElements(view.focus);
+        if (els.length) centerOnElements(els);
+    }, 250);
+}
+window.toggleTour = function() {
+    if (!views.length) return;
+    tourActive = !tourActive;
+    document.getElementById('btn-tour').classList.toggle('active', tourActive);
+    document.getElementById('tour-bar').classList.toggle('active', tourActive);
+    if (tourActive) {
+        goToViewIndex(tourIndex >= 0 ? tourIndex : 0);
+    } else {
+        document.getElementById('tour-note').classList.remove('active');
+    }
+};
+window.tourNext = function() { goToViewIndex(tourIndex + 1); };
+window.tourPrev = function() { goToViewIndex(tourIndex - 1); };
+window.closeTour = function() { if (tourActive) window.toggleTour(); };
+
+function buildRasterSafeSVG() {
+    // Canvas export of an SVG containing <foreignObject> HTML (markmap's node text)
+    // taints the canvas in Chrome even for same-origin content. Swap each
+    // foreignObject for a plain <text> element so the clone is canvas-safe.
+    const svgEl = document.getElementById('markmap');
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
+    clone.style.background = bg;
+    const textColor = getComputedStyle(document.body).getPropertyValue('--node-text-color').trim() || '#000000';
+    const ns = 'http://www.w3.org/2000/svg';
+    clone.querySelectorAll('foreignObject').forEach(fo => {
+        const div = fo.querySelector('div');
+        const text = div ? div.textContent : '';
+        const x = parseFloat(fo.getAttribute('x') || '0');
+        const y = parseFloat(fo.getAttribute('y') || '0');
+        const h = parseFloat(fo.getAttribute('height') || '20');
+        const textEl = document.createElementNS(ns, 'text');
+        textEl.setAttribute('x', x + 4);
+        textEl.setAttribute('y', y + h / 2 + 5);
+        textEl.setAttribute('font-size', '14');
+        textEl.setAttribute('font-family', '-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif');
+        textEl.setAttribute('fill', textColor);
+        textEl.textContent = text;
+        fo.parentNode.replaceChild(textEl, fo);
+    });
+    return new XMLSerializer().serializeToString(clone);
+}
+
+window.exportShareCard = function() {
+    try {
+        const svgStr = buildRasterSafeSVG();
+        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = function() {
+            try {
+                const cw = 1200, ch = 630, pad = 48;
+                const canvas = document.createElement('canvas');
+                canvas.width = cw; canvas.height = ch;
+                const ctx = canvas.getContext('2d');
+                const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
+                ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
+                const availW = cw - pad * 2, availH = ch - pad * 2 - 28;
+                const scale = Math.min(availW / img.width, availH / img.height, 1);
+                const dw = img.width * scale, dh = img.height * scale;
+                const dx = (cw - dw) / 2, dy = pad + (availH - dh) / 2;
+                ctx.drawImage(img, dx, dy, dw, dh);
+                ctx.font = '600 13px -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+                ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--badge-color').trim() || '#6a737d';
+                ctx.textAlign = 'center';
+                ctx.fillText(document.getElementById('version-badge').textContent, cw / 2, ch - 20);
+                canvas.toBlob(function(blob) {
+                    if (!blob) return;
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = (document.title || 'mindmap').replace(/\s+/g, '_') + '_share.png';
+                    document.body.appendChild(a); a.click(); a.remove();
+                }, 'image/png');
+            } catch (e) { console.error('Share card export failed while drawing', e); }
+            finally { URL.revokeObjectURL(url); }
+        };
+        img.onerror = function() { console.error('Share card export failed: could not rasterize SVG'); URL.revokeObjectURL(url); };
+        img.src = url;
+    } catch (e) { console.error('Share card export failed', e); }
+};
+
 document.getElementById('markmap').addEventListener('click', (e) => {
     const nodeGroup = e.target.closest('g.markmap-node');
     if (!nodeGroup) return;
@@ -331,7 +487,8 @@ function saveState() {
             level: currentLevel,
             width: document.getElementById('width-select').value,
             theme: currentTheme,
-            autoFit: autoFitEnabled
+            autoFit: autoFitEnabled,
+            flow: linkAnimation
         }));
     } catch (e) { /* localStorage unavailable, skip persistence */ }
 }
@@ -494,6 +651,9 @@ document.addEventListener('keydown', function(e) {
         return;
     }
     if (e.key === 'Escape' && isPitchMode) { window.togglePitchMode(); return; }
+    if (e.key === 'Escape' && tourActive) { window.closeTour(); return; }
+    if (tourActive && e.key === 'ArrowRight') { window.tourNext(); return; }
+    if (tourActive && e.key === 'ArrowLeft') { window.tourPrev(); return; }
     if (typing) return;
     if (e.key === '+' || e.key === '=') { expandTo(currentLevel + 1); }
     if (e.key === '-' || e.key === '_') { expandTo(currentLevel - 1); }
@@ -506,6 +666,8 @@ if (savedState && savedState.width) {
     window.mm.setOptions({ maxWidth: parseInt(savedState.width, 10) });
 }
 if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
+if (savedState && savedState.flow) { window.toggleLinkAnimation(); }
+if (!views.length) { document.getElementById('btn-tour').style.display = 'none'; }
 expandTo(savedState && savedState.level ? savedState.level : 2);
 window.mm.fit();
 setTimeout(renderMinimap, 300);
