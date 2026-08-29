@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ML9373/syd-markmap-forge/schemas/mindmap.schema.json",
+  "title": "syd-markmap-forge mindmap IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_name", "variant", "generation_date", "markdown"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable original document title or filename, kept as-is (not slugified)."
+    },
+    "variant": {
+      "enum": ["exhaustive", "light"],
+      "description": "exhaustive = complete knowledge model. light = critical-only curation (fewer nodes, no long enumerations)."
+    },
+    "generation_date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "YYYY-MM-DD. Authored explicitly by the agent, never resolved implicitly at render time, so a delivered artifact is byte-reproducible from its JSON source."
+    },
+    "output": {
+      "type": "string",
+      "description": "Optional explicit output filename. If omitted, derived from source_name + variant per the naming convention (lowercase, alphanumeric + underscores, _exhaustive.html or _light.html)."
+    },
+    "markdown": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sanitized Markdown hierarchy: '#' title, '##' pillars, '###' entities/topics, '-' nested detail bullets. MECE, strictly source-based, no tables, no stray arrows/glyphs, no heading-level skips."
+    }
+  }
+}

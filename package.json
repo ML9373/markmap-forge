@@ -1,0 +1,20 @@
+{
+  "name": "syd-markmap-forge",
+  "version": "0.1.0",
+  "description": "Deterministic renderer + validator for the Strategic Mind Map skill: typed JSON in, standalone interactive Markmap HTML5 out.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "syd-markmap-forge": "./bin/syd-markmap-forge.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "render:example": "node bin/syd-markmap-forge.mjs deliver examples/example.mindmap.json examples/example.html --json"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  }
+}

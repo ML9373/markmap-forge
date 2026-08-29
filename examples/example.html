@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Strategic Map</title>
+<style>
+  :root {
+    --bg-color: #f7f8fc;
+    --menu-bg: rgba(255,255,255,0.95);
+    --menu-border: #e1e4e8;
+    --text-color: #24292e;
+    --btn-bg: #ffffff;
+    --btn-border: #d1d5da;
+    --btn-hover-bg: #f3f4f6;
+    --btn-active-bg: #0366d6;
+    --btn-active-text: #ffffff;
+    --node-text-color: #000000;
+    --search-highlight: #ffd54f;
+    --minimap-bg: rgba(255,255,255,0.9);
+    --minimap-border: #d1d5da;
+    --minimap-viewport: rgba(3,102,214,0.15);
+    --minimap-viewport-border: #0366d6;
+    --badge-color: #6a737d;
+  }
+  body[data-theme="dark"] {
+    --bg-color: #12151c;
+    --menu-bg: rgba(28,32,41,0.95);
+    --menu-border: #3a3f4b;
+    --text-color: #e6e6e6;
+    --btn-bg: #1f2430;
+    --btn-border: #3a3f4b;
+    --btn-hover-bg: #2a2f3b;
+    --btn-active-bg: #4d8dff;
+    --btn-active-text: #0b0d12;
+    --node-text-color: #e6e6e6;
+    --search-highlight: #ffb300;
+    --minimap-bg: rgba(28,32,41,0.9);
+    --minimap-border: #3a3f4b;
+    --minimap-viewport: rgba(77,141,255,0.18);
+    --minimap-viewport-border: #4d8dff;
+    --badge-color: #9aa4b2;
+  }
+  body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow:hidden; background-color: var(--bg-color); transition: background-color .2s ease; }
+  svg.markmap { width:100vw; height:100vh; }
+  .markmap-node .markmap-foreign, .markmap-node .markmap-foreign * { color: var(--node-text-color) !important; }
+  .menu-left, .menu-right {
+    position: fixed; top: 20px; z-index: 100; display:flex; flex-wrap:wrap; gap:6px; max-width:44vw;
+    background: var(--menu-bg); padding:8px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.15);
+    border:1px solid var(--menu-border); backdrop-filter: blur(8px); align-items:center;
+  }
+  .menu-left { left:20px; }
+  .menu-right { right:20px; }
+  button, select, input[type="text"] {
+    cursor:pointer; padding:6px 10px; border:1px solid var(--btn-border); background: var(--btn-bg);
+    border-radius:6px; font-size:12px; font-weight:600; color: var(--text-color); transition: all .15s ease; outline:none;
+  }
+  input[type="text"] { cursor:text; font-weight:400; min-width:120px; }
+  button:hover, select:hover { background: var(--btn-hover-bg); }
+  button:active { filter: brightness(0.95); }
+  button.active { background: var(--btn-active-bg); color: var(--btn-active-text); border-color: var(--btn-active-bg); }
+  .search-wrap { display:flex; align-items:center; gap:4px; }
+  .search-count { font-size:11px; color: var(--badge-color); min-width:32px; text-align:center; }
+  .search-match { background: var(--search-highlight); border-radius: 4px; }
+  #version-badge {
+    position:fixed; bottom:12px; left:16px; z-index:90; font-size:11px; color: var(--badge-color);
+    background: var(--menu-bg); padding:4px 8px; border-radius:6px; border:1px solid var(--menu-border);
+    pointer-events:none; max-width:60vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  #minimap {
+    position:fixed; bottom:12px; right:16px; z-index:90; width:180px; height:130px;
+    background: var(--minimap-bg); border:1px solid var(--minimap-border); border-radius:8px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.15); overflow:hidden;
+  }
+  #minimap svg { width:100%; height:100%; display:block; cursor:pointer; }
+  .mm-viewport { fill: var(--minimap-viewport); stroke: var(--minimap-viewport-border); stroke-width:1.5; }
+  #hamburger { display:none; }
+  @media (max-width: 700px) {
+    .menu-left, .menu-right { display:none; max-width: 92vw; }
+    .menu-left.mobile-open, .menu-right.mobile-open { display:flex; flex-direction:column; align-items:stretch; }
+    .menu-left.mobile-open { top:70px; }
+    .menu-right.mobile-open { top:auto; bottom:20px; right:20px; }
+    #hamburger { display:block; position:fixed; top:20px; right:20px; z-index:110; font-size:16px; padding:8px 12px; }
+    #minimap { display:none; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-lib"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-view"></script>
+</head>
+<body>
+
+<button id="hamburger" onclick="toggleMobileMenu()">☰</button>
+
+<div class="menu-left" id="menu">
+  <button onclick="window.mm && window.mm.fit()">Fit Window</button>
+  <button id="btn-expand" onclick="expandAll()">Expand All</button>
+  <button id="btn-collapse" onclick="collapseAll()">Collapse All</button>
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="Search... (Ctrl+F)" oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+    <span class="search-count" id="search-count"></span>
+  </div>
+</div>
+
+<div class="menu-right" id="tools-menu">
+  <button onclick="togglePitchMode()" id="btn-pitch" title="Pitch Mode: Focus & Zoom fit on expanded nodes">📺 Pitch Mode</button>
+  <button onclick="toggleAutoFit()" id="btn-autofit" title="Toggle AutoFit on node click">🔄 AutoFit: OFF</button>
+  <select onchange="changeNodeWidth(this.value)" title="Adjust Node Text Max Width" id="width-select">
+    <option value="300">Width: 300px</option>
+    <option value="400" selected>Width: 400px</option>
+    <option value="600">Width: 600px</option>
+  </select>
+  <button onclick="toggleTheme()" id="btn-theme" title="Toggle dark mode">🌙 Dark</button>
+  <button onclick="exportSVG()" title="Export current map as SVG">⬇ SVG</button>
+  <button onclick="toggleMinimap()" id="btn-minimap" title="Show/hide minimap">🗺️ Map</button>
+</div>
+
+<div id="version-badge">syd-markmap-forge · Exhaustive · 2026-08-29</div>
+
+<div id="minimap"><svg id="minimap-svg" viewBox="0 0 180 130"></svg></div>
+
+<svg class="markmap" id="markmap"></svg>
+
+<script>
+const markdown = `
+# Syd Markmap Forge
+## Problem
+### Prior approach
+- One giant one-shot prompt asked an LLM to hand-reproduce 500 lines of HTML, CSS and JS verbatim on every run
+- **Risk**: verbatim template fidelity depended on the LLM, not on code
+- **Risk**: an unescaped backtick or a dollar-brace sequence in the source content could silently break the embedded script
+### What changed
+- The HTML, CSS and JS template is now a static asset, injected by deterministic code
+- The agent's only job is producing a small typed JSON object, not thousands of characters of markup
+## Architecture
+### Typed input
+- **schema_version**: fixed at 1
+- **source_name**: human-readable title of the original document
+- **variant**: exhaustive or light
+- **generation_date**: authored explicitly, never resolved implicitly, so a delivered artifact is reproducible from its JSON source
+- **markdown**: the sanitized outline, using heading levels for pillars and entities and bullets for detail
+### Deterministic pipeline
+- **validate**: schema shape plus markdown structural rules
+- **render**: injects the validated content into the fixed template
+- **deliver**: validates, renders, and reports a SHA-256 receipt for both the JSON source and the HTML artifact
+## Validation rules
+### Structural
+- Exactly one H1 title line
+- No heading-level skips
+- No Markdown tables
+### Safety
+- Stray arrows and pipe glyphs are rejected
+- Backticks and dollar-brace sequences are auto-escaped before they reach the embedded script
+## Output features
+### Inherited from the original template
+- Live search with match count and Ctrl+F
+- Dark and light themes with persisted state
+- Minimap with click-to-pan
+- SVG export
+- Pitch mode with fullscreen focus-and-zoom
+- One expand button per detected heading depth
+
+`;
+
+const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
+const transformer = new Transformer();
+const { root, features } = transformer.transform(markdown);
+const { styles, scripts } = transformer.getUsedAssets(features);
+if (styles) loadCSS(styles);
+if (scripts) loadJS(scripts, { getMarkmap: () => window.markmap });
+
+let isPitchMode = false;
+let autoFitEnabled = false;
+let currentTheme = 'light';
+let currentLevel = 2;
+let minimapVisible = true;
+let searchMatches = [];
+let searchIndex = -1;
+
+window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400 }, root);
+
+function walk(node, fn, depth = 1) {
+    fn(node, depth);
+    if (node.children) node.children.forEach(child => walk(child, fn, depth + 1));
+}
+
+let maxDepth = 0;
+walk(root, (n, depth) => { if (depth > maxDepth) maxDepth = depth; });
+
+const menu = document.getElementById('menu');
+for (let i = 1; i <= maxDepth; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = 'Level ' + i;
+    btn.id = 'btn-lvl-' + i;
+    btn.onclick = () => expandTo(i);
+    menu.appendChild(btn);
+}
+
+function updateActiveButton(activeId) {
+    document.querySelectorAll('.menu-left button').forEach(b => b.classList.remove('active'));
+    if (activeId) {
+        const activeBtn = document.getElementById(activeId);
+        if (activeBtn) activeBtn.classList.add('active');
+    }
+}
+
+window.expandAll = function() {
+    walk(root, n => { n.payload = { ...n.payload, fold: 0 }; });
+    window.mm.setData(root);
+    updateActiveButton('btn-expand');
+    currentLevel = maxDepth;
+    saveState();
+};
+
+window.collapseAll = function() {
+    expandTo(1);
+    updateActiveButton('btn-collapse');
+};
+
+window.expandTo = function(level) {
+    level = Math.max(1, Math.min(level, maxDepth));
+    walk(root, (n, depth) => {
+        n.payload = { ...n.payload, fold: depth >= level ? 1 : 0 };
+    });
+    window.mm.setData(root);
+    updateActiveButton('btn-lvl-' + level);
+    currentLevel = level;
+    saveState();
+};
+
+window.toggleAutoFit = function() {
+    autoFitEnabled = !autoFitEnabled;
+    window.mm.setOptions({ autoFit: autoFitEnabled });
+    const btn = document.getElementById('btn-autofit');
+    btn.textContent = autoFitEnabled ? '🔄 AutoFit: ON' : '🔄 AutoFit: OFF';
+    btn.classList.toggle('active', autoFitEnabled);
+    saveState();
+};
+
+window.togglePitchMode = function() {
+    isPitchMode = !isPitchMode;
+    const btn = document.getElementById('btn-pitch');
+    btn.classList.toggle('active', isPitchMode);
+    if (isPitchMode) {
+        btn.textContent = '📺 Pitch Mode: ON';
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    } else {
+        btn.textContent = '📺 Pitch Mode';
+        if (document.exitFullscreen && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+    }
+};
+
+window.changeNodeWidth = function(widthVal) {
+    window.mm.setOptions({ maxWidth: parseInt(widthVal, 10) });
+    window.mm.setData(root);
+    window.mm.fit();
+    saveState();
+};
+
+document.getElementById('markmap').addEventListener('click', (e) => {
+    const nodeGroup = e.target.closest('g.markmap-node');
+    if (!nodeGroup) return;
+    if (isPitchMode) {
+        setTimeout(() => { centerOnElements([nodeGroup], true); }, 200);
+    }
+});
+
+function centerOnElements(elements, useChildrenOfFirst) {
+    try {
+        const svgEl = document.getElementById('markmap');
+        let targetElements = elements;
+        if (useChildrenOfFirst) {
+            const parentGroup = elements[0];
+            const allNodes = Array.from(svgEl.querySelectorAll('g.markmap-node'));
+            const parentCircle = parentGroup.querySelector('circle');
+            if (parentCircle) {
+                const parentCtm = parentCircle.getScreenCTM();
+                if (parentCtm) {
+                    const childNodes = allNodes.filter(n => {
+                        const c = n.querySelector('circle');
+                        if (!c || n === parentGroup) return false;
+                        const ctm = c.getScreenCTM();
+                        return ctm && ctm.e > parentCtm.e + 10 && Math.abs(ctm.f - parentCtm.f) < 600;
+                    });
+                    targetElements = childNodes.length > 0 ? childNodes : [parentGroup];
+                }
+            }
+        }
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        targetElements.forEach(el => {
+            const rect = el.getBoundingClientRect();
+            if (rect.left < minX) minX = rect.left;
+            if (rect.right > maxX) maxX = rect.right;
+            if (rect.top < minY) minY = rect.top;
+            if (rect.bottom > maxY) maxY = rect.bottom;
+        });
+        const padding = 30;
+        minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+        const bboxCenterX = (minX + maxX) / 2;
+        const bboxCenterY = (minY + maxY) / 2;
+        const screenCenterX = window.innerWidth * 0.5;
+        const screenCenterY = window.innerHeight * 0.5;
+        const dx = screenCenterX - bboxCenterX;
+        const dy = screenCenterY - bboxCenterY;
+        const transform = d3.zoomTransform(svgEl);
+        const newX = transform.x + dx;
+        const newY = transform.y + dy;
+        d3.select(svgEl).transition().duration(650)
+          .call(window.mm.zoom.transform, d3.zoomIdentity.translate(newX, newY).scale(transform.k));
+    } catch (e) { /* non-critical */ }
+}
+
+function applyTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    const btn = document.getElementById('btn-theme');
+    btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+    btn.classList.toggle('active', theme === 'dark');
+    currentTheme = theme;
+    saveState();
+}
+window.toggleTheme = function() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); };
+
+const storageKey = 'markmap_state_' + (location.pathname || document.title).replace(/[^a-z0-9_]/gi, '_');
+function saveState() {
+    try {
+        localStorage.setItem(storageKey, JSON.stringify({
+            level: currentLevel,
+            width: document.getElementById('width-select').value,
+            theme: currentTheme,
+            autoFit: autoFitEnabled
+        }));
+    } catch (e) { /* localStorage unavailable, skip persistence */ }
+}
+function loadState() {
+    try {
+        const raw = localStorage.getItem(storageKey);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+window.toggleMobileMenu = function() {
+    document.getElementById('menu').classList.toggle('mobile-open');
+    document.getElementById('tools-menu').classList.toggle('mobile-open');
+};
+
+function collectMatches(query) {
+    const q = query.trim().toLowerCase();
+    const results = [];
+    if (!q) return results;
+    document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div').forEach(el => {
+        if (el.textContent.toLowerCase().includes(q)) results.push(el);
+    });
+    return results;
+}
+function clearHighlights() {
+    document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+}
+function expandForQuery(query) {
+    const q = query.trim().toLowerCase();
+    let found = false;
+    walk(root, n => {
+        const text = (n.content || '').replace(/<[^>]+>/g, '').toLowerCase();
+        if (text.includes(q)) found = true;
+    });
+    if (found) {
+        walk(root, n => { n.payload = { ...n.payload, fold: 0 }; });
+        window.mm.setData(root);
+    }
+    return found;
+}
+window.onSearchInput = function() {
+    const query = document.getElementById('search-input').value;
+    clearHighlights();
+    const countEl = document.getElementById('search-count');
+    if (!query.trim()) { countEl.textContent = ''; searchMatches = []; searchIndex = -1; return; }
+    expandForQuery(query);
+    setTimeout(() => {
+        searchMatches = collectMatches(query);
+        searchIndex = searchMatches.length ? 0 : -1;
+        searchMatches.forEach(el => el.classList.add('search-match'));
+        countEl.textContent = searchMatches.length ? '1/' + searchMatches.length : '0/0';
+        if (searchMatches.length) centerOnElements([searchMatches[0]]);
+    }, 250);
+};
+window.onSearchKeydown = function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('search-input').value = '';
+        window.onSearchInput();
+        document.getElementById('search-input').blur();
+        return;
+    }
+    if (e.key !== 'Enter' || !searchMatches.length) return;
+    e.preventDefault();
+    searchIndex = e.shiftKey
+        ? (searchIndex - 1 + searchMatches.length) % searchMatches.length
+        : (searchIndex + 1) % searchMatches.length;
+    document.getElementById('search-count').textContent = (searchIndex + 1) + '/' + searchMatches.length;
+    centerOnElements([searchMatches[searchIndex]]);
+};
+
+function getSerializedSVG() {
+    const svgEl = document.getElementById('markmap');
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
+    clone.style.background = bg;
+    return new XMLSerializer().serializeToString(clone);
+}
+window.exportSVG = function() {
+    try {
+        const svgStr = getSerializedSVG();
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = (document.title || 'mindmap').replace(/\s+/g, '_') + '.svg';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) { console.error('SVG export failed', e); }
+};
+window.toggleMinimap = function() {
+    minimapVisible = !minimapVisible;
+    document.getElementById('minimap').style.display = minimapVisible ? 'block' : 'none';
+};
+function renderMinimap() {
+    try {
+        const mmSvg = document.getElementById('minimap-svg');
+        const nodes = Array.from(document.querySelectorAll('#markmap g.markmap-node'));
+        if (!nodes.length) return;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        const points = [];
+        nodes.forEach(n => {
+            const t = n.getAttribute('transform') || '';
+            const m = t.match(/translate\(([-\d.]+)[, ]+([-\d.]+)\)/);
+            if (!m) return;
+            const x = parseFloat(m[1]), y = parseFloat(m[2]);
+            points.push([x, y]);
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+        });
+        if (!points.length || !isFinite(minX)) return;
+        const padding = 20;
+        minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+        const w = Math.max(maxX - minX, 1), h = Math.max(maxY - minY, 1);
+        while (mmSvg.firstChild) mmSvg.removeChild(mmSvg.firstChild);
+        mmSvg.setAttribute('viewBox', minX + ' ' + minY + ' ' + w + ' ' + h);
+        const ns = 'http://www.w3.org/2000/svg';
+        const accent = getComputedStyle(document.body).getPropertyValue('--btn-active-bg').trim() || '#0366d6';
+        points.forEach(p => {
+            const c = document.createElementNS(ns, 'circle');
+            c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]);
+            c.setAttribute('r', Math.max(w, h) / 220);
+            c.setAttribute('fill', accent); c.setAttribute('opacity', '0.55');
+            mmSvg.appendChild(c);
+        });
+        const mainSvg = document.getElementById('markmap');
+        const transform = d3.zoomTransform(mainSvg);
+        const vw = window.innerWidth / transform.k;
+        const vh = window.innerHeight / transform.k;
+        const vx = -transform.x / transform.k;
+        const vy = -transform.y / transform.k;
+        const rectEl = document.createElementNS(ns, 'rect');
+        rectEl.setAttribute('x', vx); rectEl.setAttribute('y', vy);
+        rectEl.setAttribute('width', vw); rectEl.setAttribute('height', vh);
+        rectEl.setAttribute('class', 'mm-viewport');
+        mmSvg.appendChild(rectEl);
+    } catch (e) { /* minimap is a non-critical enhancement */ }
+}
+document.getElementById('minimap-svg').addEventListener('click', function(e) {
+    try {
+        const pt = e.currentTarget.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        const ctm = e.currentTarget.getScreenCTM().inverse();
+        const loc = pt.matrixTransform(ctm);
+        const mainSvg = document.getElementById('markmap');
+        const transform = d3.zoomTransform(mainSvg);
+        const newX = window.innerWidth / 2 - loc.x * transform.k;
+        const newY = window.innerHeight / 2 - loc.y * transform.k;
+        d3.select(mainSvg).transition().duration(400)
+          .call(window.mm.zoom.transform, d3.zoomIdentity.translate(newX, newY).scale(transform.k));
+    } catch (e) { /* non-critical */ }
+});
+setInterval(renderMinimap, 700);
+
+document.addEventListener('keydown', function(e) {
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea';
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        document.getElementById('search-input').focus();
+        return;
+    }
+    if (e.key === 'Escape' && isPitchMode) { window.togglePitchMode(); return; }
+    if (typing) return;
+    if (e.key === '+' || e.key === '=') { expandTo(currentLevel + 1); }
+    if (e.key === '-' || e.key === '_') { expandTo(currentLevel - 1); }
+});
+
+const savedState = loadState();
+applyTheme((savedState && savedState.theme) || 'light');
+if (savedState && savedState.width) {
+    document.getElementById('width-select').value = savedState.width;
+    window.mm.setOptions({ maxWidth: parseInt(savedState.width, 10) });
+}
+if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
+expandTo(savedState && savedState.level ? savedState.level : 2);
+window.mm.fit();
+setTimeout(renderMinimap, 300);
+</script>
+</body>
+</html>
