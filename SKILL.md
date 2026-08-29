@@ -1,6 +1,6 @@
 ---
 name: syd-markmap-forge
-description: Convert a technical document (specs, slides, PDFs, markdown) into ONE standalone interactive HTML5 Strategic Mind Map — a complete knowledge model of the source. Use when the user wants a document turned into an explorable mind map with search, dark mode, minimap, pitch mode, and SVG export instead of a slide deck.
+description: Convert a technical document (specs, slides, PDFs, markdown) into ONE standalone interactive HTML5 Strategic Mind Map — a complete knowledge model of the source. Use when the user wants a document turned into an explorable mind map with search, dark mode, pitch mode, and SVG/PNG export instead of a slide deck.
 license: MIT
 metadata:
   version: "0.2"
@@ -29,7 +29,6 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
      "markdown": "# Title\n## Pillar\n### Entity\n- detail\n"
    }
    ```
-   Optionally add `views` — an authored guided tour (ported from archify's views/focus concept), an ordered array of `{ id, label, focus: [string, ...], note }`. Only add a view when the user wants a scripted walkthrough (e.g. for a live pitch); most documents don't need one. Every `focus` string must be a substring that genuinely appears in `markdown` — never invent a tour stop pointing at content that isn't there, the validator rejects it anyway.
 4. Validate:
    ```bash
    node bin/syd-markmap-forge.mjs validate candidate.mindmap.json --json
@@ -44,9 +43,11 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
 
 ## What's fixed vs. authored
 
-Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 CDN includes, and all interaction JS (search, dark mode, minimap, pitch mode, SVG export, per-depth expand buttons, localStorage state).
+Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 CDN includes, and all interaction JS (search, dark mode, pitch mode, SVG/PNG export, per-depth expand buttons, localStorage state).
 
-Authored per document: `source_name`, `generation_date`, and the sanitized `markdown` outline (plus optional `views`). That's the entire surface area — resist the temptation to touch `templates/strategic-map.template.html` for a one-off document; if the template itself needs a new feature, that's a renderer change, reviewed and tested once, not a per-document improvisation.
+Authored per document: `source_name`, `generation_date`, and the sanitized `markdown` outline. That's the entire surface area — resist the temptation to touch `templates/strategic-map.template.html` for a one-off document; if the template itself needs a new feature, that's a renderer change, reviewed and tested once, not a per-document improvisation.
+
+Guided Tour and the minimap were tried and removed (2026-08-30) — don't re-propose either without reading the Changelog entry on why first.
 
 ## Multiple documents, one theme
 

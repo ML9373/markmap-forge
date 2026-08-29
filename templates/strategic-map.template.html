@@ -17,10 +17,6 @@
     --btn-active-text: #ffffff;
     --node-text-color: #000000;
     --search-highlight: #ffd54f;
-    --minimap-bg: rgba(255,255,255,0.9);
-    --minimap-border: #d1d5da;
-    --minimap-viewport: rgba(3,102,214,0.15);
-    --minimap-viewport-border: #0366d6;
     --badge-color: #6a737d;
   }
   body[data-theme="dark"] {
@@ -35,10 +31,6 @@
     --btn-active-text: #0b0d12;
     --node-text-color: #e6e6e6;
     --search-highlight: #ffb300;
-    --minimap-bg: rgba(28,32,41,0.9);
-    --minimap-border: #3a3f4b;
-    --minimap-viewport: rgba(77,141,255,0.18);
-    --minimap-viewport-border: #4d8dff;
     --badge-color: #9aa4b2;
   }
   body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow:hidden; background-color: var(--bg-color); transition: background-color .2s ease; }
@@ -71,53 +63,6 @@
     background: var(--menu-bg); padding:4px 8px; border-radius:6px; border:1px solid var(--menu-border);
     pointer-events:none; max-width:60vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  #minimap {
-    position:fixed; bottom:12px; right:16px; z-index:90; width:180px; height:130px;
-    background: var(--minimap-bg); border:1px solid var(--minimap-border); border-radius:8px;
-    box-shadow:0 4px 14px rgba(0,0,0,0.15); overflow:hidden;
-  }
-  #minimap svg { width:100%; height:100%; display:block; cursor:pointer; }
-  .mm-viewport { fill: none; stroke: var(--minimap-viewport-border); stroke-width:1.5; }
-  #tour-bar {
-    position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:95; display:none;
-    align-items:center; gap:8px; background: var(--menu-bg); padding:6px 10px; border-radius:8px;
-    border:1px solid var(--menu-border); box-shadow:0 4px 14px rgba(0,0,0,0.15); backdrop-filter: blur(8px);
-  }
-  #tour-bar.active { display:flex; }
-  #tour-label { font-size:12px; font-weight:600; color: var(--text-color); max-width:36vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #tour-index { font-size:11px; color: var(--badge-color); min-width:32px; text-align:center; }
-  #tour-note {
-    position:fixed; bottom:54px; left:50%; transform:translateX(-50%); z-index:95; display:none;
-    max-width:56vw; background: var(--menu-bg); padding:8px 12px; border-radius:8px; border:1px solid var(--menu-border);
-    font-size:12px; color: var(--text-color); box-shadow:0 4px 14px rgba(0,0,0,0.15);
-  }
-  #tour-note.active { display:block; }
-  
-  /* Tour Principal Focal Node Highlight */
-  .tour-principal-node {
-    background: #fef08a !important;
-    color: #111827 !important;
-    font-weight: 700 !important;
-    border-radius: 6px !important;
-    padding: 3px 10px !important;
-    box-shadow: 0 0 0 2px #eab308, 0 4px 14px rgba(0,0,0,0.18) !important;
-    display: inline-block !important;
-  }
-  .tour-principal-node * {
-    color: #111827 !important;
-    font-weight: 700 !important;
-  }
-  body[data-theme="dark"] .tour-principal-node {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    font-weight: 700 !important;
-    box-shadow: 0 0 0 2px #60a5fa, 0 0 18px rgba(37,99,235,0.5) !important;
-  }
-  body[data-theme="dark"] .tour-principal-node * {
-    color: #ffffff !important;
-    font-weight: 700 !important;
-  }
-
   body.animate-links .markmap-link { stroke-dasharray: 4 6; animation: mm-flow 0.6s linear infinite; }
   @keyframes mm-flow { to { stroke-dashoffset: -10; } }
   #hamburger { display:none; }
@@ -127,8 +72,6 @@
     .menu-left.mobile-open { top:70px; }
     .menu-right.mobile-open { top:auto; bottom:20px; right:20px; }
     #hamburger { display:block; position:fixed; top:20px; right:20px; z-index:110; font-size:16px; padding:8px 12px; }
-    #minimap { display:none; }
-    #tour-bar, #tour-note { display:none !important; }
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -166,22 +109,9 @@
   <button onclick="toggleLinkAnimation()" id="btn-flow" title="Decorative animated flow along branches (visual only, not a data-flow direction)">〰️ Animate</button>
   <button onclick="exportSVG()" title="Export current map as SVG">⬇ SVG</button>
   <button onclick="exportPNG()" title="Export high-resolution PNG image">🖼️ PNG</button>
-  <button onclick="toggleMinimap()" id="btn-minimap" title="Show/hide minimap">🗺️ Map</button>
-  <button onclick="toggleTour()" id="btn-tour" title="Guided tour through authored views">🧭 Tour</button>
 </div>
 
 <div id="version-badge">[INSERT_SOURCE_NAME] · [INSERT_GENERATION_DATE]</div>
-
-<div id="minimap"><svg id="minimap-svg" viewBox="0 0 180 130"></svg></div>
-
-<div id="tour-note"></div>
-<div id="tour-bar">
-  <button onclick="tourPrev()" title="Previous stop">‹</button>
-  <span id="tour-label"></span>
-  <span id="tour-index"></span>
-  <button onclick="tourNext()" title="Next stop">›</button>
-  <button onclick="closeTour()" title="Close tour">✕</button>
-</div>
 
 <svg class="markmap" id="markmap"></svg>
 
@@ -189,8 +119,6 @@
 const markdown = `
 [INSERT SANITIZED MARKDOWN HIERARCHY HERE]
 `;
-
-const views = [INSERT_VIEWS_JSON];
 
 const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
 const transformer = new Transformer();
@@ -203,44 +131,31 @@ let isPitchMode = false;
 let autoFitEnabled = false;
 let currentTheme = 'light';
 let currentLevel = 2;
-let minimapVisible = true;
 let searchMatches = [];
 let searchIndex = -1;
 let linkAnimation = false;
-let tourActive = false;
-let tourIndex = -1;
 
 window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400 }, root);
 
-// After a fit, the tree can render directly underneath the floating menu panels or the
-// minimap (all position:fixed, with no built-in collision avoidance). Nudge the pan so the
-// topmost node clears the menus, and so no node sits behind the minimap corner.
+// After a fit, the tree can render directly underneath the floating menu panels (both
+// position:fixed, with no built-in collision avoidance). Nudge the pan so the topmost node
+// clears the menus.
 function adjustForOverlap() {
     try {
         const svg = document.getElementById('markmap');
         const menuLeft = document.querySelector('.menu-left').getBoundingClientRect();
         const menuRight = document.querySelector('.menu-right').getBoundingClientRect();
-        const minimapEl = document.getElementById('minimap');
-        const minimapRect = (minimapEl.style.display !== 'none') ? minimapEl.getBoundingClientRect() : null;
         const nodeEls = Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign'));
         if (!nodeEls.length) return;
 
         const rects = nodeEls.map(el => el.getBoundingClientRect());
         const reservedTop = Math.max(menuLeft.bottom, menuRight.bottom) + 16;
         const topMost = Math.min(...rects.map(r => r.top));
-        let dy = topMost < reservedTop ? reservedTop - topMost : 0;
+        const dy = topMost < reservedTop ? reservedTop - topMost : 0;
 
-        let dx = 0;
-        if (minimapRect) {
-            const overlapsMinimap = rects.some(r =>
-                !(r.right < minimapRect.left || r.left > minimapRect.right || r.bottom < minimapRect.top || r.top > minimapRect.bottom)
-            );
-            if (overlapsMinimap) dx = -(minimapRect.width * 0.6 + 16);
-        }
-
-        if (dx || dy) {
+        if (dy) {
             const transform = d3.zoomTransform(svg);
-            const newTransform = d3.zoomIdentity.translate(transform.x + dx, transform.y + dy).scale(transform.k);
+            const newTransform = d3.zoomIdentity.translate(transform.x, transform.y + dy).scale(transform.k);
             d3.select(svg).call(window.mm.zoom.transform, newTransform);
         }
     } catch (e) { /* non-critical */ }
@@ -371,138 +286,6 @@ window.toggleLinkAnimation = function() {
     saveState();
 };
 
-// relDepthLimit is relative to the focal node's own depth, not absolute from root — it's driven
-// by currentLevel (whichever "Level N" menu button is active) so the tour respects the user's
-// chosen detail level instead of a hardcoded offset.
-function applyTourSelectiveFolding(rootNode, primaryNeedle, relDepthLimit = 2) {
-    const needle = primaryNeedle.toLowerCase();
-    
-    // 1. Find the exact primary focal node
-    let focalNode = null;
-    function findFocal(n) {
-        const text = (n.content || '').replace(/<[^>]+>/g, '').toLowerCase();
-        if (text.includes(needle) && !focalNode) {
-            focalNode = n;
-            return;
-        }
-        if (n.children) n.children.forEach(findFocal);
-    }
-    findFocal(rootNode);
-    if (!focalNode) focalNode = rootNode;
-
-    const focalDepth = focalNode._treeDepth || 0;
-    const maxAllowedDepth = focalDepth + relDepthLimit;
-
-    // 2. Mark ancestors on path from root to focalNode
-    function markAncestors(n) {
-        if (n === focalNode) return true;
-        let onPath = false;
-        if (n.children) {
-            n.children.forEach(c => {
-                if (markAncestors(c)) onPath = true;
-            });
-        }
-        n._isAncestor = onPath;
-        return onPath;
-    }
-    markAncestors(rootNode);
-
-    // 3. Apply fold: unfold path, unfold descendants up to N+2, fold everything else
-    function applyFold(n, insideFocal = false) {
-        const isFocal = (n === focalNode);
-        const inFocalSubtree = insideFocal || isFocal;
-
-        n._isPrincipal = isFocal;
-
-        if (n === rootNode || n._isAncestor) {
-            n.payload = { ...n.payload, fold: 0 };
-        } else if (inFocalSubtree) {
-            n.payload = { ...n.payload, fold: (n._treeDepth < maxAllowedDepth) ? 0 : 1 };
-        } else {
-            n.payload = { ...n.payload, fold: 1 };
-        }
-
-        if (n.children) {
-            n.children.forEach(c => applyFold(c, inFocalSubtree));
-        }
-    }
-    applyFold(rootNode, false);
-
-    return focalNode;
-}
-
-function clearTourSpotlights() {
-    document.querySelectorAll('.tour-principal-node').forEach(el => el.classList.remove('tour-principal-node'));
-}
-
-function applyPrincipalHighlight(primaryNeedle) {
-    const needle = primaryNeedle.toLowerCase();
-    const allGroups = Array.from(document.querySelectorAll('#markmap g.markmap-node'));
-    let matched = false;
-    allGroups.forEach(group => {
-        if (matched) return;
-        const text = group.textContent.toLowerCase();
-        if (text.includes(needle)) {
-            const div = group.querySelector('.markmap-foreign > div');
-            if (div) {
-                div.classList.add('tour-principal-node');
-                matched = true;
-            }
-        }
-    });
-}
-
-function goToViewIndex(i) {
-    if (!views.length) return;
-    tourIndex = ((i % views.length) + views.length) % views.length;
-    const view = views[tourIndex];
-    
-    // Primary focal term for this tour stop
-    const primaryFocus = (view.focus && view.focus.length > 0) ? view.focus[0] : view.label;
-    
-    // Selective smart folding: unfold path, unfold down to N + currentLevel (whatever depth is
-    // currently checked in the Level 1..N menu, so the tour respects the user's own detail
-    // setting instead of a fixed offset), collapse all other branches.
-    applyTourSelectiveFolding(root, primaryFocus, currentLevel);
-    window.mm.setData(root);
-    
-    document.getElementById('tour-label').textContent = view.label;
-    document.getElementById('tour-index').textContent = (tourIndex + 1) + '/' + views.length;
-    const noteEl = document.getElementById('tour-note');
-    noteEl.textContent = view.note || '';
-    noteEl.classList.toggle('active', tourActive && !!view.note);
-    
-    setTimeout(() => {
-        window.safeFit();
-        clearTourSpotlights();
-        applyPrincipalHighlight(primaryFocus);
-    }, 150);
-    setTimeout(() => {
-        window.safeFit();
-        clearTourSpotlights();
-        applyPrincipalHighlight(primaryFocus);
-    }, 450);
-}
-
-window.toggleTour = function() {
-    if (!views.length) return;
-    tourActive = !tourActive;
-    document.body.classList.toggle('tour-active', tourActive);
-    document.getElementById('btn-tour').classList.toggle('active', tourActive);
-    document.getElementById('tour-bar').classList.toggle('active', tourActive);
-    if (tourActive) {
-        goToViewIndex(tourIndex >= 0 ? tourIndex : 0);
-    } else {
-        clearTourSpotlights();
-        document.getElementById('tour-note').classList.remove('active');
-        expandTo(currentLevel);
-        setTimeout(() => { window.safeFit(); }, 200);
-    }
-};
-window.tourNext = function() { goToViewIndex(tourIndex + 1); };
-window.tourPrev = function() { goToViewIndex(tourIndex - 1); };
-window.closeTour = function() { if (tourActive) window.toggleTour(); };
-
 window.exportPNG = function() {
     try {
         const svgEl = document.getElementById('markmap');
@@ -520,12 +303,12 @@ window.exportPNG = function() {
         clone.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
         clone.setAttribute('width', w);
         clone.setAttribute('height', h);
-        
+
         const bg = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#ffffff';
         clone.style.background = bg;
         const textColor = getComputedStyle(document.body).getPropertyValue('--node-text-color').trim() || '#000000';
         const ns = 'http://www.w3.org/2000/svg';
-        
+
         clone.querySelectorAll('foreignObject').forEach(fo => {
             const div = fo.querySelector('div');
             const text = div ? div.textContent : '';
@@ -703,84 +486,6 @@ window.exportSVG = function() {
         URL.revokeObjectURL(url);
     } catch (e) { console.error('SVG export failed', e); }
 };
-window.toggleMinimap = function() {
-    minimapVisible = !minimapVisible;
-    document.getElementById('minimap').style.display = minimapVisible ? 'block' : 'none';
-};
-function renderMinimap() {
-    try {
-        const mmSvg = document.getElementById('minimap-svg');
-        const nodes = Array.from(document.querySelectorAll('#markmap g.markmap-node'));
-        if (!nodes.length) return;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        const points = [];
-        nodes.forEach(n => {
-            const t = n.getAttribute('transform') || '';
-            const m = t.match(/translate\(([-\d.]+)[, ]+([-\d.]+)\)/);
-            if (!m) return;
-            const x = parseFloat(m[1]), y = parseFloat(m[2]);
-            points.push([x, y]);
-            if (x < minX) minX = x; if (x > maxX) maxX = x;
-            if (y < minY) minY = y; if (y > maxY) maxY = y;
-        });
-        if (!points.length || !isFinite(minX)) return;
-        const padding = 20;
-        minX -= padding; maxX += padding; minY -= padding; maxY += padding;
-        const w = Math.max(maxX - minX, 1), h = Math.max(maxY - minY, 1);
-        while (mmSvg.firstChild) mmSvg.removeChild(mmSvg.firstChild);
-        mmSvg.setAttribute('viewBox', minX + ' ' + minY + ' ' + w + ' ' + h);
-        const ns = 'http://www.w3.org/2000/svg';
-        const accent = getComputedStyle(document.body).getPropertyValue('--btn-active-bg').trim() || '#0366d6';
-
-        // Tree silhouette first (links, then node dots) so the viewport rect never paints over the thumbnail.
-        const linkGroup = document.createElementNS(ns, 'g');
-        linkGroup.setAttribute('fill', 'none');
-        linkGroup.setAttribute('stroke', accent);
-        linkGroup.setAttribute('stroke-opacity', '0.45');
-        linkGroup.setAttribute('stroke-width', String(Math.max(w, h) / 300));
-        document.querySelectorAll('#markmap path.markmap-link').forEach(p => {
-            const d = p.getAttribute('d');
-            if (!d) return;
-            const clone = document.createElementNS(ns, 'path');
-            clone.setAttribute('d', d);
-            linkGroup.appendChild(clone);
-        });
-        mmSvg.appendChild(linkGroup);
-        points.forEach(p => {
-            const c = document.createElementNS(ns, 'circle');
-            c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]);
-            c.setAttribute('r', Math.max(w, h) / 220);
-            c.setAttribute('fill', accent); c.setAttribute('opacity', '0.7');
-            mmSvg.appendChild(c);
-        });
-        const mainSvg = document.getElementById('markmap');
-        const transform = d3.zoomTransform(mainSvg);
-        const vw = window.innerWidth / transform.k;
-        const vh = window.innerHeight / transform.k;
-        const vx = -transform.x / transform.k;
-        const vy = -transform.y / transform.k;
-        const rectEl = document.createElementNS(ns, 'rect');
-        rectEl.setAttribute('x', vx); rectEl.setAttribute('y', vy);
-        rectEl.setAttribute('width', vw); rectEl.setAttribute('height', vh);
-        rectEl.setAttribute('class', 'mm-viewport');
-        mmSvg.appendChild(rectEl);
-    } catch (e) { /* non-critical */ }
-}
-document.getElementById('minimap-svg').addEventListener('click', function(e) {
-    try {
-        const pt = e.currentTarget.createSVGPoint();
-        pt.x = e.clientX; pt.y = e.clientY;
-        const ctm = e.currentTarget.getScreenCTM().inverse();
-        const loc = pt.matrixTransform(ctm);
-        const mainSvg = document.getElementById('markmap');
-        const transform = d3.zoomTransform(mainSvg);
-        const newX = window.innerWidth / 2 - loc.x * transform.k;
-        const newY = window.innerHeight / 2 - loc.y * transform.k;
-        d3.select(mainSvg).transition().duration(400)
-          .call(window.mm.zoom.transform, d3.zoomIdentity.translate(newX, newY).scale(transform.k));
-    } catch (e) { /* non-critical */ }
-});
-setInterval(renderMinimap, 700);
 
 document.addEventListener('keydown', function(e) {
     const tag = (e.target && e.target.tagName || '').toLowerCase();
@@ -791,9 +496,6 @@ document.addEventListener('keydown', function(e) {
         return;
     }
     if (e.key === 'Escape' && isPitchMode) { window.togglePitchMode(); return; }
-    if (e.key === 'Escape' && tourActive) { window.closeTour(); return; }
-    if (tourActive && e.key === 'ArrowRight') { window.tourNext(); return; }
-    if (tourActive && e.key === 'ArrowLeft') { window.tourPrev(); return; }
     if (typing) return;
     if (e.key === '+' || e.key === '=') { expandTo(currentLevel + 1); }
     if (e.key === '-' || e.key === '_') { expandTo(currentLevel - 1); }
@@ -807,10 +509,8 @@ if (savedState && savedState.width) {
 }
 if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
 if (savedState && savedState.flow) { window.toggleLinkAnimation(); }
-if (!views.length) { document.getElementById('btn-tour').style.display = 'none'; }
 expandTo(savedState && savedState.level ? savedState.level : 2);
 window.safeFit();
-setTimeout(renderMinimap, 300);
 </script>
 </body>
 </html>

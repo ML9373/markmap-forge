@@ -95,7 +95,7 @@ async function main() {
 		assert.ok(h1 && h1.length > 0, "root node did not render");
 
 		// Regression guard: no node should render underneath the fixed menu panels
-		// (this was a real bug — see the 2026-08-30/31 template fix).
+		// (this was a real bug — see the 2026-08-30 template fix).
 		const overlap = await session.evalJs(`
 			(function() {
 				const menuLeft = document.querySelector('.menu-left').getBoundingClientRect();
@@ -110,14 +110,22 @@ async function main() {
 		`);
 		assert.equal(overlap, false, "a node rendered underneath the fixed menu panels after fit");
 
-		// The minimap must draw an actual tree silhouette (links), not just node dots.
-		const minimapLinkCount = await session.evalJs("document.querySelectorAll('#minimap-svg path').length");
-		assert.ok(minimapLinkCount > 0, "minimap drew no tree links (regressed to dots-only or empty)");
+		// Tour Mode and the minimap were removed 2026-08-30 (dead end, never worked reliably
+		// despite repeated fixes) — assert they no longer exist rather than exercising them.
+		const removed = await session.evalJs(`
+			({
+				tourFn: typeof window.toggleTour,
+				minimapFn: typeof window.toggleMinimap,
+				minimapEl: !!document.getElementById('minimap'),
+				tourBarEl: !!document.getElementById('tour-bar'),
+			})
+		`);
+		assert.equal(removed.tourFn, "undefined", "window.toggleTour still exists — Tour Mode was supposed to be fully removed");
+		assert.equal(removed.minimapFn, "undefined", "window.toggleMinimap still exists — the minimap was supposed to be fully removed");
+		assert.equal(removed.minimapEl, false, "#minimap element still exists in the template");
+		assert.equal(removed.tourBarEl, false, "#tour-bar element still exists in the template");
 
-		// Tour, dark mode, search, and PNG export must all run without throwing.
-		await session.evalJs("window.toggleTour ? window.toggleTour() : null");
-		await sleep(500);
-		await session.evalJs("window.closeTour ? window.closeTour() : null");
+		// Dark mode, search, and PNG export must all run without throwing.
 		await session.evalJs("window.toggleTheme()");
 		await sleep(150);
 		const theme = await session.evalJs("document.body.getAttribute('data-theme')");
@@ -139,7 +147,7 @@ async function main() {
 		const errors = session.consoleMessages.filter((m) => m.startsWith("[error]") || m.startsWith("[exception]"));
 		assert.equal(errors.length, 0, "console errors during interaction:\n" + errors.join("\n"));
 
-		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, minimap links, tour, dark mode, PNG export — zero console errors)");
+		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, tour/minimap absent, dark mode, PNG export — zero console errors)");
 	} finally {
 		if (session) session.ws.close();
 		chrome.kill();

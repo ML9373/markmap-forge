@@ -27,26 +27,6 @@
       "type": "string",
       "minLength": 1,
       "description": "Sanitized Markdown hierarchy: '#' title, '##' pillars, '###' entities/topics, '-' nested detail bullets. MECE, strictly source-based, no tables, no stray arrows/glyphs, no heading-level skips."
-    },
-    "views": {
-      "type": "array",
-      "description": "Optional guided tour: an ordered list of authored stops through the mind map, each centering on the nodes matched by 'focus'. Mirrors archify's views/focus concept, adapted to a hierarchy: 'focus' text must be grounded in 'markdown', never invented.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "label", "focus"],
-        "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "label": { "type": "string", "minLength": 1 },
-          "focus": {
-            "type": "array",
-            "minItems": 1,
-            "items": { "type": "string", "minLength": 1 },
-            "description": "Substrings to match against node text (case-insensitive) to find what this stop centers on. Must each appear in 'markdown' — the validator rejects a focus term that matches nothing."
-          },
-          "note": { "type": "string", "description": "Short caption shown while this stop is active." }
-        }
-      }
     }
   }
 }
