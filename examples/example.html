@@ -4,63 +4,91 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Interactive Strategic Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
   :root {
-    --bg-color: #f7f8fc;
-    --menu-bg: rgba(255,255,255,0.95);
-    --menu-border: #e1e4e8;
-    --text-color: #24292e;
+    --bg-color: #eef1f5;
+    --menu-bg: rgba(255,255,255,0.92);
+    --menu-border: #d7dee6;
+    --text-color: #29354a;
     --btn-bg: #ffffff;
-    --btn-border: #d1d5da;
-    --btn-hover-bg: #f3f4f6;
-    --btn-active-bg: #0366d6;
-    --btn-active-text: #ffffff;
-    --node-text-color: #000000;
-    --search-highlight: #ffd54f;
-    --badge-color: #6a737d;
+    --btn-border: #ccd5e0;
+    --btn-hover-bg: #f2f5f9;
+    --btn-active-bg: #b3551f;
+    --btn-active-text: #fff7f0;
+    --node-text-color: #1c2534;
+    --search-highlight: #f4c690;
+    --badge-color: #6b7889;
+    --root-color: #b3551f;
   }
   body[data-theme="dark"] {
-    --bg-color: #12151c;
-    --menu-bg: rgba(28,32,41,0.95);
-    --menu-border: #3a3f4b;
-    --text-color: #e6e6e6;
-    --btn-bg: #1f2430;
-    --btn-border: #3a3f4b;
-    --btn-hover-bg: #2a2f3b;
-    --btn-active-bg: #4d8dff;
-    --btn-active-text: #0b0d12;
-    --node-text-color: #e6e6e6;
-    --search-highlight: #ffb300;
-    --badge-color: #9aa4b2;
+    --bg-color: #10151d;
+    --menu-bg: rgba(23,31,43,0.92);
+    --menu-border: #2a3547;
+    --text-color: #dbe3ee;
+    --btn-bg: #171f2b;
+    --btn-border: #2a3547;
+    --btn-hover-bg: #202b3a;
+    --btn-active-bg: #e0793a;
+    --btn-active-text: #1a0f08;
+    --node-text-color: #e8edf3;
+    --search-highlight: #a85f22;
+    --badge-color: #7c8aa0;
+    --root-color: #e0793a;
   }
-  body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow:hidden; background-color: var(--bg-color); transition: background-color .2s ease; }
+  body {
+    margin:0; padding:0; overflow:hidden; background-color: var(--bg-color); transition: background-color .2s ease;
+    font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
   svg.markmap { width:100vw; height:100vh; }
+
+  /* markmap injects its own stylesheet at runtime (loadCSS); #markmap beats its .markmap
+     class rule on specificity alone, so these custom-property + presentation-attribute
+     overrides win regardless of script load order. */
+  #markmap {
+    --mm-font-family: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mm-font-size: 15.5px;
+    --markmap-font: 400 var(--mm-font-size)/1.55 var(--mm-font-family);
+    --markmap-text-color: var(--node-text-color);
+    --markmap-a-color: var(--root-color);
+    --markmap-a-hover-color: var(--root-color);
+    --markmap-code-bg: rgba(179,85,31,0.1);
+    --markmap-code-color: var(--root-color);
+    --markmap-highlight-bg: var(--search-highlight);
+    --markmap-highlight-node-bg: rgba(179,85,31,0.16);
+    --markmap-circle-open-bg: var(--bg-color);
+  }
+  body[data-theme="dark"] #markmap { --markmap-code-bg: rgba(224,121,58,0.14); }
+  #markmap path.markmap-link { stroke-opacity: 0.75; stroke-width: 1.6px !important; }
+  #markmap g.markmap-node > circle { stroke-width: 1.6px !important; }
+  #markmap g.markmap-node > .markmap-foreign strong { color: var(--root-color); }
   .markmap-node .markmap-foreign, .markmap-node .markmap-foreign * { color: var(--node-text-color) !important; }
+
   .menu-left {
-    position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; flex-direction: column; gap: 6px; max-width: 48vw;
-    background: var(--menu-bg); padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-    border: 1px solid var(--menu-border); backdrop-filter: blur(8px);
+    position: fixed; top: 20px; left: 20px; z-index: 100; display: flex; flex-direction: column; gap: 7px; max-width: 48vw;
+    background: var(--menu-bg); padding: 9px 13px; border-radius: 10px; box-shadow: 0 8px 24px rgba(20,30,45,0.12);
+    border: 1px solid var(--menu-border); backdrop-filter: blur(10px);
   }
   .menu-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .menu-right {
     position: fixed; top: 20px; right: 20px; z-index: 100; display: flex; flex-wrap: wrap; gap: 6px; max-width: 46vw;
-    background: var(--menu-bg); padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-    border: 1px solid var(--menu-border); backdrop-filter: blur(8px); align-items: center;
+    background: var(--menu-bg); padding: 9px 13px; border-radius: 10px; box-shadow: 0 8px 24px rgba(20,30,45,0.12);
+    border: 1px solid var(--menu-border); backdrop-filter: blur(10px); align-items: center;
   }
   button, select, input[type="text"] {
-    cursor:pointer; padding:6px 10px; border:1px solid var(--btn-border); background: var(--btn-bg);
-    border-radius:6px; font-size:12px; font-weight:600; color: var(--text-color); transition: all .15s ease; outline:none;
+    cursor:pointer; padding:6px 11px; border:1px solid var(--btn-border); background: var(--btn-bg);
+    border-radius:6px; font-family: inherit; font-size:12px; font-weight:600; color: var(--text-color); transition: all .15s ease; outline:none;
   }
   input[type="text"] { cursor:text; font-weight:400; min-width:120px; }
-  button:hover, select:hover { background: var(--btn-hover-bg); }
+  button:hover, select:hover { background: var(--btn-hover-bg); border-color: var(--root-color); }
   button:active { filter: brightness(0.95); }
   button.active { background: var(--btn-active-bg); color: var(--btn-active-text); border-color: var(--btn-active-bg); }
   .search-wrap { display:flex; align-items:center; gap:4px; }
-  .search-count { font-size:11px; color: var(--badge-color); min-width:32px; text-align:center; }
-  .search-match { background: var(--search-highlight); border-radius: 4px; }
+  .search-count { font-family: "JetBrains Mono", monospace; font-size:11px; color: var(--badge-color); min-width:36px; text-align:center; }
+  .search-match { background: var(--search-highlight); border-radius: 3px; }
   #version-badge {
-    position:fixed; bottom:12px; left:16px; z-index:90; font-size:11px; color: var(--badge-color);
-    background: var(--menu-bg); padding:4px 8px; border-radius:6px; border:1px solid var(--menu-border);
+    position:fixed; bottom:12px; left:16px; z-index:90; font-family: "JetBrains Mono", monospace; font-size:11px; letter-spacing:0.01em; color: var(--badge-color);
+    background: var(--menu-bg); padding:5px 9px; border-radius:6px; border:1px solid var(--menu-border);
     pointer-events:none; max-width:60vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   body.animate-links .markmap-link { stroke-dasharray: 4 6; animation: mm-flow 0.6s linear infinite; }
@@ -104,6 +132,26 @@
     <option value="300">Width: 300px</option>
     <option value="400" selected>Width: 400px</option>
     <option value="600">Width: 600px</option>
+  </select>
+  <select onchange="changePalette(this.value)" title="Branch color palette" id="palette-select">
+    <option value="sienna" selected>Palette: Sienna</option>
+    <option value="ocean">Palette: Ocean</option>
+    <option value="sunset">Palette: Sunset</option>
+    <option value="forest">Palette: Forest</option>
+    <option value="slate">Palette: Slate</option>
+  </select>
+  <select onchange="changeFont(this.value)" title="Node text typeface" id="font-select">
+    <option value="source-sans" selected>Font: Source Sans</option>
+    <option value="ibm-plex">Font: IBM Plex Sans</option>
+    <option value="jetbrains-mono">Font: JetBrains Mono</option>
+    <option value="georgia">Font: Georgia</option>
+    <option value="system">Font: System UI</option>
+  </select>
+  <select onchange="changeFontSize(this.value)" title="Node text size" id="fontsize-select">
+    <option value="s">Size: S</option>
+    <option value="m" selected>Size: M</option>
+    <option value="l">Size: L</option>
+    <option value="xl">Size: XL</option>
   </select>
   <button onclick="toggleTheme()" id="btn-theme" title="Toggle dark mode">🌙 Dark</button>
   <button onclick="toggleLinkAnimation()" id="btn-flow" title="Decorative animated flow along branches (visual only, not a data-flow direction)">〰️ Animate</button>
@@ -175,8 +223,48 @@ let currentLevel = 2;
 let searchMatches = [];
 let searchIndex = -1;
 let linkAnimation = false;
+let currentPalette = 'sienna';
+let currentFont = 'source-sans';
+let currentFontSize = 'm';
 
-window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400 }, root);
+// Curated harmonious palettes (in place of markmap's default d3.schemeCategory10 rainbow) —
+// each keeps per-branch color tracing useful without a random clip-art-primary-colors look.
+const PALETTES = {
+    sienna: ['#b3551f', '#4a6fa5', '#3f7d5c', '#a37f2c', '#7d5ba6', '#3f8a8b'],
+    ocean:  ['#0f6fb0', '#1a8f8f', '#2e7d5c', '#3b5b92', '#0e8a7a', '#5b7fa6'],
+    sunset: ['#c1440e', '#d9822b', '#a83f5c', '#7d3c98', '#c2185b', '#e0793a'],
+    forest: ['#2f5d3a', '#5c7a3f', '#7d6b3f', '#3f6b52', '#8a6d3f', '#4f7d4f'],
+    slate:  ['#2c3e50', '#3d5a80', '#5b7ba6', '#7d9cbd', '#98b4d4', '#b8cbe0'],
+};
+const FONT_STACKS = {
+    'source-sans':    `"Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`,
+    'ibm-plex':       `"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`,
+    'jetbrains-mono': `"JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace`,
+    georgia:          `Georgia, "Times New Roman", serif`,
+    system:           `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`,
+};
+const FONT_SIZES = { s: '14px', m: '15.5px', l: '18px', xl: '21px' };
+
+window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400, color: d3.scaleOrdinal(PALETTES[currentPalette]) }, root);
+
+window.changePalette = function(name) {
+    currentPalette = PALETTES[name] ? name : 'sienna';
+    window.mm.setOptions({ color: d3.scaleOrdinal(PALETTES[currentPalette]) });
+    window.mm.setData(root);
+    saveState();
+};
+
+window.changeFont = function(key) {
+    currentFont = FONT_STACKS[key] ? key : 'source-sans';
+    document.getElementById('markmap').style.setProperty('--mm-font-family', FONT_STACKS[currentFont]);
+    saveState();
+};
+
+window.changeFontSize = function(key) {
+    currentFontSize = FONT_SIZES[key] ? key : 'm';
+    document.getElementById('markmap').style.setProperty('--mm-font-size', FONT_SIZES[currentFontSize]);
+    saveState();
+};
 
 // After a fit, the tree can render directly underneath the floating menu panels (both
 // position:fixed, with no built-in collision avoidance). Nudge the pan so the topmost node
@@ -437,7 +525,10 @@ function saveState() {
             width: document.getElementById('width-select').value,
             theme: currentTheme,
             autoFit: autoFitEnabled,
-            flow: linkAnimation
+            flow: linkAnimation,
+            palette: currentPalette,
+            font: currentFont,
+            fontSize: currentFontSize
         }));
     } catch (e) { /* skip persistence */ }
 }
@@ -550,6 +641,18 @@ if (savedState && savedState.width) {
 }
 if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
 if (savedState && savedState.flow) { window.toggleLinkAnimation(); }
+if (savedState && savedState.palette && savedState.palette !== currentPalette) {
+    document.getElementById('palette-select').value = savedState.palette;
+    window.changePalette(savedState.palette);
+}
+if (savedState && savedState.font && savedState.font !== currentFont) {
+    document.getElementById('font-select').value = savedState.font;
+    window.changeFont(savedState.font);
+}
+if (savedState && savedState.fontSize && savedState.fontSize !== currentFontSize) {
+    document.getElementById('fontsize-select').value = savedState.fontSize;
+    window.changeFontSize(savedState.fontSize);
+}
 expandTo(savedState && savedState.level ? savedState.level : 2);
 window.safeFit();
 </script>
