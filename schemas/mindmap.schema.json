@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/ML9373/markmap-forge/schemas/mindmap.schema.json",
-  "title": "syd-markmap-forge mindmap IR",
+  "title": "markmap-forge mindmap IR",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "source_name", "generation_date", "markdown"],

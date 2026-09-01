@@ -1,5 +1,5 @@
 ---
-name: syd-markmap-forge
+name: markmap-forge
 description: Convert a technical document (specs, slides, PDFs, markdown) into ONE standalone interactive HTML5 Strategic Mind Map — a complete knowledge model of the source. Use when the user wants a document turned into an explorable mind map with search, dark mode, pitch mode, and SVG/PNG export instead of a slide deck.
 license: MIT
 metadata:
@@ -8,7 +8,7 @@ metadata:
   origin: private evolution of the ad hoc "Project HTML Converter" prompt pipeline (SYDRVAULT)
 ---
 
-# Syd Markmap Forge
+# Markmap Forge
 
 Turn a source document into a small typed JSON object; a deterministic renderer compiles it into the standalone interactive HTML. The agent never hand-writes HTML, CSS, or JS for the output — only the JSON.
 
@@ -19,7 +19,7 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
 ## Fast authoring path
 
 1. Read the source document (raw or already-sanitized markdown in the vault).
-2. Produce a sanitized Markdown hierarchy: `#` title (exactly one), `##` pillars, `###` entities/topics, `-` nested detail bullets. MECE, strictly source-based. No tables (use nested bullets instead), no stray arrows/glyphs (`↓ -> => |`), no heading-level skips. Mark true gaps as `**Unknown / Not specified**: <what's missing>` and inferred structure as `**Assumption**`. Never invent content.
+2. Produce a sanitized Markdown hierarchy: `#` title (exactly one), `##` pillars, `###` entities/topics, `-` nested detail bullets. MECE, strictly source-based. For definition-style bullets, ALWAYS bold the prefix before the colon (e.g., `- **Key**: Value`). No tables (use nested bullets instead), no stray arrows/glyphs (`↓ -> => |`), no heading-level skips. Mark true gaps as `**Unknown / Not specified**: <what's missing>` and inferred structure as `**Assumption**`. Never invent content.
 3. Write the candidate JSON matching `schemas/mindmap.schema.json`. The map is always exhaustive: every definition, dependency, association, constraint, warning, and value list present in the source.
    ```json
    {
@@ -31,12 +31,12 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
    ```
 4. Validate:
    ```bash
-   node bin/syd-markmap-forge.mjs validate candidate.mindmap.json --json
+   node bin/markmap-forge.mjs validate candidate.mindmap.json --json
    ```
    Fix only the diagnosed lines; errors block delivery, warnings (backtick / `${` sequences) are auto-escaped by the renderer but worth a readability pass.
 5. Deliver once validation passes:
    ```bash
-   node bin/syd-markmap-forge.mjs deliver candidate.mindmap.json output.html --json
+   node bin/markmap-forge.mjs deliver candidate.mindmap.json output.html --json
    ```
    This re-validates, renders, and reports a SHA-256 receipt for both the JSON source and the HTML artifact. A non-zero exit is never success.
 6. Open the delivered HTML and sanity-check it (see `examples/example.html` for a working reference) before handing it back.

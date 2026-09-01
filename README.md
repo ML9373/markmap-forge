@@ -1,4 +1,4 @@
-# syd-markmap-forge
+# markmap-forge
 
 Deterministic renderer + validator for the Strategic Mind Map skill: a small typed JSON in, a standalone interactive Markmap HTML5 document out.
 
@@ -15,9 +15,9 @@ npm install
 ## CLI
 
 ```bash
-node bin/syd-markmap-forge.mjs validate <input.json> [--json]
-node bin/syd-markmap-forge.mjs render <input.json> [output.html] [--json]
-node bin/syd-markmap-forge.mjs deliver <input.json> [output.html] [--json]
+node bin/markmap-forge.mjs validate <input.json> [--json]
+node bin/markmap-forge.mjs render <input.json> [output.html] [--json]
+node bin/markmap-forge.mjs deliver <input.json> [output.html] [--json]
 ```
 
 `deliver` validates, renders, and prints a SHA-256 receipt for both the JSON source and the HTML artifact.

@@ -66,7 +66,7 @@ async function main() {
 		return;
 	}
 
-	const profileDir = mkdtempSync(path.join(tmpdir(), "syd-markmap-forge-smoke-"));
+	const profileDir = mkdtempSync(path.join(tmpdir(), "markmap-forge-smoke-"));
 	const port = 9222 + Math.floor(Math.random() * 1000);
 	const chrome = spawn(chromePath, [
 		"--headless=new",

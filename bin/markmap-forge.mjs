@@ -119,8 +119,8 @@ function main() {
 }
 
 function usageError(specific) {
-	console.error("Usage: syd-markmap-forge <validate|render|deliver> <input.json> [output.html] [--json]");
-	if (specific) console.error(`  syd-markmap-forge ${specific}`);
+	console.error("Usage: markmap-forge <validate|render|deliver> <input.json> [output.html] [--json]");
+	if (specific) console.error(`  markmap-forge ${specific}`);
 	process.exit(2);
 }
 
