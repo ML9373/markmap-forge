@@ -126,7 +126,8 @@
 </div>
 
 <div class="menu-right" id="tools-menu">
-  <button onclick="togglePitchMode()" id="btn-pitch" title="Pitch Mode: Focus & Zoom fit on expanded nodes">📺 Pitch Mode</button>
+  <button onclick="togglePitchMode()" id="btn-pitch" title="Pitch Mode: fullscreen presentation view">📺 Pitch Mode</button>
+  <button onclick="toggleAccordion()" id="btn-accordion" title="Accordion: opening a node auto-collapses its already-open siblings at every level (works in or out of Pitch Mode)">🪗 Accordion: OFF</button>
   <button onclick="toggleAutoFit()" id="btn-autofit" title="Toggle AutoFit on node click">🔄 AutoFit: OFF</button>
   <select onchange="changeNodeWidth(this.value)" title="Adjust Node Text Max Width" id="width-select">
     <option value="300">Width: 300px</option>
@@ -159,13 +160,13 @@
   <button onclick="exportPNG()" title="Export high-resolution PNG image">🖼️ PNG</button>
 </div>
 
-<div id="version-badge">syd-markmap-forge · 2026-08-29</div>
+<div id="version-badge">markmap-forge · 2026-08-29</div>
 
 <svg class="markmap" id="markmap"></svg>
 
 <script>
 const markdown = `
-# Syd Markmap Forge
+# Markmap Forge
 ## Problem
 ### Prior approach
 - One giant one-shot prompt asked an LLM to hand-reproduce 500 lines of HTML, CSS and JS verbatim on every run
@@ -217,6 +218,7 @@ if (styles) loadCSS(styles);
 if (scripts) loadJS(scripts, { getMarkmap: () => window.markmap });
 
 let isPitchMode = false;
+let accordionEnabled = false;
 let autoFitEnabled = false;
 let currentTheme = 'light';
 let currentLevel = 2;
@@ -322,6 +324,20 @@ function assignDepths(node, depth = 0) {
 }
 assignDepths(root, 0);
 
+// markmap-view replaces node object identities below the top level on data updates, so a
+// parent reference cached once at load time goes stale after the first setData() call. Depth
+// (a plain number, copied by value through that churn) stays reliable to cache; the parent
+// (an object reference) has to be re-resolved live, by walking from the current root, every time.
+function findParentLive(node, target) {
+    if (!node.children) return null;
+    for (const child of node.children) {
+        if (child === target) return node;
+        const found = findParentLive(child, target);
+        if (found) return found;
+    }
+    return null;
+}
+
 function walk(node, fn) {
     fn(node, node._treeDepth || 0);
     if (node.children) node.children.forEach(child => walk(child, fn));
@@ -380,6 +396,14 @@ window.toggleAutoFit = function() {
     saveState();
 };
 
+window.toggleAccordion = function() {
+    accordionEnabled = !accordionEnabled;
+    const btn = document.getElementById('btn-accordion');
+    btn.textContent = accordionEnabled ? '🪗 Accordion: ON' : '🪗 Accordion: OFF';
+    btn.classList.toggle('active', accordionEnabled);
+    saveState();
+};
+
 window.togglePitchMode = function() {
     isPitchMode = !isPitchMode;
     const btn = document.getElementById('btn-pitch');
@@ -389,7 +413,6 @@ window.togglePitchMode = function() {
         if (!autoFitEnabled) {
             window.toggleAutoFit();
         }
-        window.safeFit();
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {});
         }
@@ -400,6 +423,30 @@ window.togglePitchMode = function() {
         }
     }
 };
+
+// Accordion mode: opening a node collapses its already-open siblings (same parent, same
+// depth) at every level, so only one path from root to leaf stays expanded at a time.
+// Independent of Pitch Mode — toggled on its own via the Accordion button.
+//
+// Folding is delegated to markmap's own toggleNode(node, recursive), the same method its
+// built-in click handling uses — it animates the collapse from that node's own position.
+// Going through our own setData(root) instead would replay a full-tree layout, which
+// animates as if every node were collapsing back into the root rather than into its parent.
+function applyAccordion(clickedNode) {
+    if (!clickedNode) return;
+    const justOpened = !clickedNode.payload || !clickedNode.payload.fold;
+    if (!justOpened) return;
+    const parent = findParentLive(root, clickedNode);
+    if (!parent) return;
+    const siblings = parent.children || [];
+    siblings.forEach(sibling => {
+        if (sibling === clickedNode) return;
+        const siblingOpen = sibling.children && sibling.children.length && (!sibling.payload || !sibling.payload.fold);
+        if (siblingOpen) {
+            window.mm.toggleNode(sibling, true);
+        }
+    });
+}
 
 window.changeNodeWidth = function(widthVal) {
     window.mm.setOptions({ maxWidth: parseInt(widthVal, 10) });
@@ -502,8 +549,9 @@ window.exportPNG = function() {
 document.getElementById('markmap').addEventListener('click', (e) => {
     const nodeGroup = e.target.closest('g.markmap-node');
     if (!nodeGroup) return;
-    if (isPitchMode) {
-        setTimeout(() => { window.safeFit(); }, 250);
+    if (accordionEnabled) {
+        const clickedNode = d3.select(nodeGroup).datum();
+        applyAccordion(clickedNode);
     }
 });
 
@@ -525,6 +573,7 @@ function saveState() {
             width: document.getElementById('width-select').value,
             theme: currentTheme,
             autoFit: autoFitEnabled,
+            accordion: accordionEnabled,
             flow: linkAnimation,
             palette: currentPalette,
             font: currentFont,
@@ -640,6 +689,7 @@ if (savedState && savedState.width) {
     window.mm.setOptions({ maxWidth: parseInt(savedState.width, 10) });
 }
 if (savedState && savedState.autoFit) { window.toggleAutoFit(); }
+if (savedState && savedState.accordion) { window.toggleAccordion(); }
 if (savedState && savedState.flow) { window.toggleLinkAnimation(); }
 if (savedState && savedState.palette && savedState.palette !== currentPalette) {
     document.getElementById('palette-select').value = savedState.palette;
