@@ -4,6 +4,12 @@ Deterministic renderer + validator for the Strategic Mind Map skill: a small typ
 
 This replaces an earlier ad hoc workflow where an LLM was asked to hand-reproduce a ~500-line HTML/CSS/JS template verbatim on every run. Here the template is a static asset and a Node.js CLI does the substitution, validation, and escaping — so the output is byte-reproducible from its JSON source and immune to the LLM subtly corrupting the template.
 
+![A rendered Markmap Forge strategic map, with its level, search, palette and export controls](https://raw.githubusercontent.com/ML9373/markmap-forge/main/docs/preview.png)
+
+*The document above is `examples/example.html`, produced by the CLI from `examples/example.mindmap.json`. Regenerate the screenshot with `npm run capture:preview` so it never drifts from the template.*
+
+Every output is a single self-contained HTML file: no build step, no network fetch at view time, with search, level folding, pitch mode, dark mode, palette/font/size controls and SVG/PNG export built in.
+
 See [`SKILL.md`](./SKILL.md) for the authoring contract (how an agent should use this).
 
 ## Install

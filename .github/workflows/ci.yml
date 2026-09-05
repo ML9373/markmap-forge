@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Unit tests (schema and validation rules)
+        run: npm run test:unit
+
+      # The live smoke test drives a real headless Chrome through raw CDP: it is the only
+      # thing that guards the 669-line template, i.e. what actually produces the deliverable.
+      - name: Live render smoke test
+        run: npm run test:live
+
+      # The CLI must also work with no node_modules at all, because this repo is deployed
+      # as a vault skill that runs without a prior install (see lib/validate.mjs).
+      - name: CLI runs without node_modules
+        run: |
+          mkdir -p /tmp/nodeps
+          tar cf - --exclude=node_modules --exclude=.git . | (cd /tmp/nodeps && tar xf -)
+          cd /tmp/nodeps
+          node bin/markmap-forge.mjs deliver examples/example.mindmap.json /tmp/out.html --json

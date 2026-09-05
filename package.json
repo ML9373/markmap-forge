@@ -11,11 +11,42 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && node test/live-render.smoke.mjs",
     "test:live": "node test/live-render.smoke.mjs",
-    "render:example": "node bin/markmap-forge.mjs deliver examples/example.mindmap.json examples/example.html --json"
+    "render:example": "node bin/markmap-forge.mjs deliver examples/example.mindmap.json examples/example.html --json",
+    "test:unit": "node --test test/*.test.mjs",
+    "capture:preview": "node scripts/capture-preview.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1"
-  }
+  },
+  "files": [
+    "bin",
+    "lib",
+    "schemas",
+    "templates",
+    "vendor",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ML9373/markmap-forge.git"
+  },
+  "homepage": "https://github.com/ML9373/markmap-forge#readme",
+  "bugs": {
+    "url": "https://github.com/ML9373/markmap-forge/issues"
+  },
+  "keywords": [
+    "markmap",
+    "mind-map",
+    "json-schema",
+    "cli-tool",
+    "html5",
+    "visualization",
+    "d3",
+    "claude-code",
+    "ai-agent-tools"
+  ]
 }
