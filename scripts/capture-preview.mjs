@@ -74,13 +74,24 @@ async function main() {
 		"--window-size=1600,1000",
 		`--user-data-dir=${profileDir}`,
 		"--no-first-run",
+		// Same reason as the smoke test: no sandbox available inside a CI container.
+		...(process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : []),
 		`file://${EXAMPLE_HTML}`,
 	], { stdio: "ignore" });
 
 	try {
-		await sleep(1200);
-		const list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
-		const page = list.find((t) => t.type === "page");
+		// Poll rather than assume a fixed startup delay.
+		let page = null;
+		const deadline = Date.now() + 20000;
+		while (!page && Date.now() < deadline) {
+			try {
+				const list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
+				page = list.find((t) => t.type === "page") ?? null;
+			} catch {
+				// Chrome not up yet
+			}
+			if (!page) await sleep(250);
+		}
 		if (!page) throw new Error("no page target found in Chrome");
 		const ws = new WebSocket(page.webSocketDebuggerUrl);
 		await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });

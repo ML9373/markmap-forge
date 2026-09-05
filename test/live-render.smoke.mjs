@@ -59,6 +59,45 @@ class CdpSession {
 	}
 }
 
+/**
+ * On a CI runner Chrome cannot use its sandbox (no user namespaces in the container) and
+ * exits immediately, which used to surface only as `ECONNREFUSED` on the debugging port.
+ * Local runs keep the sandbox on.
+ */
+function chromeSandboxFlags() {
+	return process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [];
+}
+
+/**
+ * Poll the CDP endpoint until Chrome is up instead of assuming a fixed startup delay: a cold
+ * CI runner is routinely slower than any hardcoded sleep, and a single fetch turns that into
+ * a hard failure.
+ */
+async function waitForPageTarget(port, chrome, getStderr, timeoutMs = 20000) {
+	const deadline = Date.now() + timeoutMs;
+	let lastErr;
+	while (Date.now() < deadline) {
+		if (chrome.exitCode !== null) {
+			throw new Error(
+				`Chrome exited with code ${chrome.exitCode} before the debugging port opened.\n` +
+				`stderr:\n${getStderr() || "(empty)"}`
+			);
+		}
+		try {
+			const list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
+			const page = list.find((t) => t.type === "page");
+			if (page) return page;
+		} catch (e) {
+			lastErr = e;
+		}
+		await sleep(250);
+	}
+	throw new Error(
+		`Chrome debugging port ${port} never became available within ${timeoutMs} ms ` +
+		`(last error: ${lastErr?.message ?? "none"}).\nstderr:\n${getStderr() || "(empty)"}`
+	);
+}
+
 async function main() {
 	const chromePath = findChrome();
 	if (!chromePath) {
@@ -75,14 +114,18 @@ async function main() {
 		"--window-size=1600,1000",
 		`--user-data-dir=${profileDir}`,
 		"--no-first-run",
+		...chromeSandboxFlags(),
 		`file://${EXAMPLE_HTML}`,
-	], { stdio: "ignore" });
+	], { stdio: ["ignore", "ignore", "pipe"] });
+
+	// Keep Chrome's stderr so a launch failure says why instead of surfacing as a bare
+	// ECONNREFUSED on the debugging port.
+	let chromeStderr = "";
+	chrome.stderr?.on("data", (d) => { chromeStderr += d.toString(); });
 
 	let session;
 	try {
-		await sleep(1200);
-		const list = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
-		const page = list.find((t) => t.type === "page");
+		const page = await waitForPageTarget(port, chrome, () => chromeStderr);
 		assert.ok(page, "no page target found in Chrome");
 		const ws = new WebSocket(page.webSocketDebuggerUrl);
 		await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
