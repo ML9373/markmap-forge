@@ -3,7 +3,7 @@ name: markmap-forge
 description: Convert a technical document (specs, slides, PDFs, markdown) into ONE standalone interactive HTML5 Strategic Mind Map — a complete knowledge model of the source. Use when the user wants a document turned into an explorable mind map with search, dark mode, pitch mode, and SVG/PNG export instead of a slide deck.
 license: MIT
 metadata:
-  version: "0.2"
+  version: "0.3"
   author: Mouiz Lanikpekoun
   origin: private evolution of the ad hoc "Project HTML Converter" prompt pipeline (SYDRVAULT)
 ---
@@ -43,11 +43,19 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
 
 ## What's fixed vs. authored
 
-Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 CDN includes, and all interaction JS (search, dark mode, pitch mode, SVG/PNG export, per-depth expand buttons, localStorage state).
+Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 CDN includes, and all interaction JS (search, dark mode, pitch mode, SVG/PNG export, per-depth expand buttons, the six branch palettes, the in-page source editor, localStorage state).
 
 Authored per document: `source_name`, `generation_date`, and the sanitized `markdown` outline. That's the entire surface area — resist the temptation to touch `templates/strategic-map.template.html` for a one-off document; if the template itself needs a new feature, that's a renderer change, reviewed and tested once, not a per-document improvisation.
 
 Guided Tour and the minimap were tried and removed (2026-08-30) — don't re-propose either without reading the Changelog entry on why first.
+
+## In-page source editor (2026-09-08)
+
+Every delivered map carries an **✏️ Edit** panel holding the markdown it was built from. Applying an edit re-runs the same `Transformer` that produced the file, so the tree stays a projection of the source rather than something hand-patched in the DOM: the Level buttons rebuild to the new depth, and a source with no heading is refused with an error instead of blanking the map.
+
+Scope, deliberately: edits live in the viewer's browser (`localStorage`) and in whatever they copy or download from the panel. **The `.html` on disk and the `.mindmap.json` are never rewritten by the page.** The panel is for iterating on wording in front of the map — `↺ Revert to original` always restores the delivered source. To make an edit durable, copy it back into the `.mindmap.json` and re-run `deliver`, which keeps the JSON as the single source of truth and preserves the SHA-256 receipt chain.
+
+The palette list includes **Violet** alongside Sienna, Ocean, Sunset, Forest and Slate. Each palette carries its own light/dark accent pair for the root node and bold text, so switching palette never leaves the previous accent behind.
 
 ## Multiple documents, one theme
 

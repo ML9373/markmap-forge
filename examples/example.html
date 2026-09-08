@@ -94,6 +94,34 @@
   body.animate-links .markmap-link { stroke-dasharray: 4 6; animation: mm-flow 0.6s linear infinite; }
   @keyframes mm-flow { to { stroke-dashoffset: -10; } }
   #hamburger { display:none; }
+
+  /* Source editor: edits the markmap's own markdown in place. The map is regenerated from
+     the textarea, so the document stays the single source of truth for the tree. */
+  #editor-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 46vw); z-index: 120;
+    display: none; flex-direction: column; gap: 8px; padding: 14px;
+    background: var(--menu-bg); border-left: 1px solid var(--menu-border);
+    box-shadow: -10px 0 30px rgba(20,30,45,0.16); backdrop-filter: blur(10px);
+  }
+  #editor-panel.open { display: flex; }
+  #editor-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  #editor-title { font-size:13px; font-weight:700; color: var(--text-color); }
+  #editor-hint { font-size:11px; color: var(--badge-color); font-weight:400; }
+  #editor-text {
+    flex: 1; width: 100%; box-sizing: border-box; resize: none; cursor: text;
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.6; padding: 10px; tab-size: 2;
+    color: var(--text-color); background: var(--btn-bg);
+    border: 1px solid var(--btn-border); border-radius: 8px; outline: none;
+  }
+  #editor-text:focus { border-color: var(--root-color); }
+  #editor-actions { display:flex; flex-wrap:wrap; gap:6px; }
+  #editor-status { font-size:11px; min-height:15px; color: var(--badge-color); font-family: "JetBrains Mono", monospace; }
+  #editor-status.error { color: #c0392b; }
+  body[data-theme="dark"] #editor-status.error { color: #ff8a80; }
+  #editor-status.ok { color: var(--root-color); }
+  #btn-edit.dirty::after { content: " •"; }
+  @media (max-width: 700px) { #editor-panel { width: 100vw; } }
   @media (max-width: 700px) {
     .menu-left, .menu-right { display:none; max-width: 92vw; }
     .menu-left.mobile-open, .menu-right.mobile-open { display:flex; flex-direction:column; align-items:stretch; }
@@ -140,6 +168,7 @@
     <option value="sunset">Palette: Sunset</option>
     <option value="forest">Palette: Forest</option>
     <option value="slate">Palette: Slate</option>
+    <option value="violet">Palette: Violet</option>
   </select>
   <select onchange="changeFont(this.value)" title="Node text typeface" id="font-select">
     <option value="source-sans" selected>Font: Source Sans</option>
@@ -154,10 +183,26 @@
     <option value="l">Size: L</option>
     <option value="xl">Size: XL</option>
   </select>
+  <button onclick="toggleEditor()" id="btn-edit" title="Edit the map's markdown source and regenerate the tree">✏️ Edit</button>
   <button onclick="toggleTheme()" id="btn-theme" title="Toggle dark mode">🌙 Dark</button>
   <button onclick="toggleLinkAnimation()" id="btn-flow" title="Decorative animated flow along branches (visual only, not a data-flow direction)">〰️ Animate</button>
   <button onclick="exportSVG()" title="Export current map as SVG">⬇ SVG</button>
   <button onclick="exportPNG()" title="Export high-resolution PNG image">🖼️ PNG</button>
+</div>
+
+<div id="editor-panel">
+  <div id="editor-head">
+    <span id="editor-title">Markdown source <span id="editor-hint">— Ctrl/Cmd+Enter to apply</span></span>
+    <button onclick="toggleEditor()" title="Close the editor">✕</button>
+  </div>
+  <textarea id="editor-text" spellcheck="false"></textarea>
+  <div id="editor-status"></div>
+  <div id="editor-actions">
+    <button onclick="applyEditor()" title="Rebuild the map from the text above">✓ Apply</button>
+    <button onclick="revertEditor()" title="Restore the markdown this file was generated with">↺ Revert to original</button>
+    <button onclick="copyMarkdown()" title="Copy the current markdown to the clipboard">⧉ Copy</button>
+    <button onclick="downloadMarkdown()" title="Download the current markdown as a .md file">⬇ .md</button>
+  </div>
 </div>
 
 <div id="version-badge">markmap-forge · 2026-08-29</div>
@@ -212,10 +257,16 @@ const markdown = `
 
 const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
 const transformer = new Transformer();
-const { root, features } = transformer.transform(markdown);
-const { styles, scripts } = transformer.getUsedAssets(features);
-if (styles) loadCSS(styles);
-if (scripts) loadJS(scripts, { getMarkmap: () => window.markmap });
+const sourceMarkdown = markdown;
+let currentMarkdown = markdown;
+let { root, features } = transformer.transform(markdown);
+loadAssets(features);
+
+function loadAssets(feat) {
+    const { styles, scripts } = transformer.getUsedAssets(feat);
+    if (styles) loadCSS(styles);
+    if (scripts) loadJS(scripts, { getMarkmap: () => window.markmap });
+}
 
 let isPitchMode = false;
 let accordionEnabled = false;
@@ -237,6 +288,19 @@ const PALETTES = {
     sunset: ['#c1440e', '#d9822b', '#a83f5c', '#7d3c98', '#c2185b', '#e0793a'],
     forest: ['#2f5d3a', '#5c7a3f', '#7d6b3f', '#3f6b52', '#8a6d3f', '#4f7d4f'],
     slate:  ['#2c3e50', '#3d5a80', '#5b7ba6', '#7d9cbd', '#98b4d4', '#b8cbe0'],
+    violet: ['#6d28d9', '#9d5cf0', '#4f46e5', '#c026d3', '#7c3aed', '#a78bfa'],
+};
+
+// Each palette carries its own accent (root node, bold text, focus rings) as a light/dark
+// pair, so switching palette does not leave the previous palette's accent behind. The sienna
+// pair is exactly the two values the stylesheet declares, so the default look is unchanged.
+const PALETTE_ACCENTS = {
+    sienna: ['#b3551f', '#e0793a'],
+    ocean:  ['#0f6fb0', '#4aa8e0'],
+    sunset: ['#c1440e', '#e8804a'],
+    forest: ['#2f5d3a', '#6aa87a'],
+    slate:  ['#2c3e50', '#8fb0cc'],
+    violet: ['#6d28d9', '#b18cf5'],
 };
 const FONT_STACKS = {
     'source-sans':    `"Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`,
@@ -249,10 +313,20 @@ const FONT_SIZES = { s: '14px', m: '15.5px', l: '18px', xl: '21px' };
 
 window.mm = Markmap.create('#markmap', { autoFit: false, maxWidth: 400, color: d3.scaleOrdinal(PALETTES[currentPalette]) }, root);
 
+function applyPaletteAccent() {
+    const pair = PALETTE_ACCENTS[currentPalette] || PALETTE_ACCENTS.sienna;
+    const accent = pair[currentTheme === 'dark' ? 1 : 0];
+    document.body.style.setProperty('--root-color', accent);
+    // The active-button fill is the same accent in the stylesheet's own defaults, so it has to
+    // travel with the palette too — otherwise the selected Level button keeps the old hue.
+    document.body.style.setProperty('--btn-active-bg', accent);
+}
+
 window.changePalette = function(name) {
     currentPalette = PALETTES[name] ? name : 'sienna';
     window.mm.setOptions({ color: d3.scaleOrdinal(PALETTES[currentPalette]) });
     window.mm.setData(root);
+    applyPaletteAccent();
     saveState();
 };
 
@@ -344,16 +418,23 @@ function walk(node, fn) {
 }
 
 let maxDepth = 0;
-walk(root, (n, depth) => { if (depth > maxDepth) maxDepth = depth; });
-
 const levelsContainer = document.getElementById('levels-container');
-for (let i = 1; i <= maxDepth; i++) {
-    const btn = document.createElement('button');
-    btn.textContent = 'Level ' + i;
-    btn.id = 'btn-lvl-' + i;
-    btn.onclick = () => expandTo(i);
-    levelsContainer.appendChild(btn);
+
+// The level buttons mirror the tree's actual depth, so they are rebuilt rather than authored:
+// editing the source can add or remove a heading level and the row has to follow.
+function rebuildLevels() {
+    maxDepth = 0;
+    walk(root, (n, depth) => { if (depth > maxDepth) maxDepth = depth; });
+    levelsContainer.textContent = '';
+    for (let i = 1; i <= maxDepth; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Level ' + i;
+        btn.id = 'btn-lvl-' + i;
+        btn.onclick = () => expandTo(i);
+        levelsContainer.appendChild(btn);
+    }
 }
+rebuildLevels();
 
 function updateActiveButton(activeId) {
     document.querySelectorAll('.menu-left button').forEach(b => b.classList.remove('active'));
@@ -561,6 +642,7 @@ function applyTheme(theme) {
     btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
     btn.classList.toggle('active', theme === 'dark');
     currentTheme = theme;
+    applyPaletteAccent();
     saveState();
 }
 window.toggleTheme = function() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); };
@@ -577,7 +659,10 @@ function saveState() {
             flow: linkAnimation,
             palette: currentPalette,
             font: currentFont,
-            fontSize: currentFontSize
+            fontSize: currentFontSize,
+            // Only an actual edit is stored. Persisting the pristine markdown on every save
+            // would bloat localStorage with a copy of a string the file already contains.
+            markdown: currentMarkdown === sourceMarkdown ? null : currentMarkdown
         }));
     } catch (e) { /* skip persistence */ }
 }
@@ -587,6 +672,100 @@ function loadState() {
         return raw ? JSON.parse(raw) : null;
     } catch (e) { return null; }
 }
+
+// ---- Source editor -------------------------------------------------------------------
+// The tree is a projection of the markdown, never the other way round: every edit goes
+// through the same transformer that built the file, so what the editor shows is always what
+// produced the map. Edits live in this browser (localStorage) and in whatever the user copies
+// or downloads — the .html on disk is not rewritten, and neither is the .mindmap.json.
+function setEditorStatus(msg, kind) {
+    const el = document.getElementById('editor-status');
+    el.textContent = msg || '';
+    el.className = kind || '';
+}
+
+function markDirty() {
+    document.getElementById('btn-edit').classList.toggle('dirty', currentMarkdown !== sourceMarkdown);
+}
+
+function applyMarkdown(md, opts) {
+    const silent = opts && opts.silent;
+    let result;
+    try {
+        result = transformer.transform(md);
+    } catch (err) {
+        setEditorStatus('Could not parse: ' + err.message, 'error');
+        return false;
+    }
+    if (!result.root || !result.root.children || result.root.children.length === 0) {
+        setEditorStatus('Nothing to render — the source needs at least one heading.', 'error');
+        return false;
+    }
+    root = result.root;
+    loadAssets(result.features);
+    assignDepths(root, 0);
+    rebuildLevels();
+    currentMarkdown = md;
+    window.mm.setData(root);
+    expandTo(Math.min(currentLevel, maxDepth));
+    window.safeFit();
+    markDirty();
+    if (!silent) setEditorStatus('Applied — ' + maxDepth + ' levels.', 'ok');
+    return true;
+}
+
+window.toggleEditor = function() {
+    const panel = document.getElementById('editor-panel');
+    const opening = !panel.classList.contains('open');
+    panel.classList.toggle('open', opening);
+    document.getElementById('btn-edit').classList.toggle('active', opening);
+    if (opening) {
+        const ta = document.getElementById('editor-text');
+        ta.value = currentMarkdown;
+        setEditorStatus('');
+        ta.focus();
+    }
+};
+
+window.applyEditor = function() {
+    applyMarkdown(document.getElementById('editor-text').value);
+};
+
+window.revertEditor = function() {
+    document.getElementById('editor-text').value = sourceMarkdown;
+    if (applyMarkdown(sourceMarkdown, { silent: true })) {
+        setEditorStatus('Reverted to the original source.', 'ok');
+    }
+    saveState();
+};
+
+window.copyMarkdown = function() {
+    const text = document.getElementById('editor-text').value;
+    const done = () => setEditorStatus('Copied to clipboard.', 'ok');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => setEditorStatus('Clipboard refused — select the text and copy manually.', 'error'));
+    } else {
+        document.getElementById('editor-text').select();
+        setEditorStatus('Clipboard unavailable — the text is selected, press Ctrl/Cmd+C.', 'error');
+    }
+};
+
+window.downloadMarkdown = function() {
+    const blob = new Blob([document.getElementById('editor-text').value], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (document.getElementById('version-badge').textContent.split('\u00b7')[0].trim() || 'mindmap').replace(/[^a-z0-9]+/gi, '_').slice(0, 60) + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setEditorStatus('Downloaded.', 'ok');
+};
+
+document.getElementById('editor-text').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); window.applyEditor(); }
+    if (e.key === 'Escape') { e.stopPropagation(); window.toggleEditor(); }
+});
 
 window.toggleMobileMenu = function() {
     document.getElementById('menu').classList.toggle('mobile-open');
@@ -703,7 +882,12 @@ if (savedState && savedState.fontSize && savedState.fontSize !== currentFontSize
     document.getElementById('fontsize-select').value = savedState.fontSize;
     window.changeFontSize(savedState.fontSize);
 }
+if (savedState && savedState.markdown && savedState.markdown !== sourceMarkdown) {
+    applyMarkdown(savedState.markdown, { silent: true });
+}
 expandTo(savedState && savedState.level ? savedState.level : 2);
+markDirty();
+applyPaletteAccent();
 window.safeFit();
 </script>
 </body>

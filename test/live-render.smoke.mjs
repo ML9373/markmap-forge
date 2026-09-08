@@ -187,10 +187,70 @@ async function main() {
 		`);
 		assert.equal(pngClicked, true, "PNG export did not trigger a download");
 
+		// Violet palette: switching palette must repaint the branches AND move the
+		// accent with it, otherwise the previous palette's accent stays on the root and the
+		// bold text (the bug this pairing was written to prevent).
+		await session.evalJs("window.changePalette('violet')");
+		await sleep(1500); // d3 interpolates the stroke color over the transition — read only once it has settled
+		const palette = await session.evalJs(`
+			(function() {
+				const toRgb = (hex) => {
+					const n = parseInt(hex.slice(1), 16);
+					return 'rgb(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ')';
+				};
+				const violet = ['#6d28d9', '#9d5cf0', '#4f46e5', '#c026d3', '#7c3aed', '#a78bfa'].map(toRgb);
+				const strokes = Array.from(document.querySelectorAll('#markmap path.markmap-link'))
+					.map(el => el.getAttribute('stroke') || '');
+				return {
+					accent: getComputedStyle(document.body).getPropertyValue('--root-color').trim(),
+					activeBtn: getComputedStyle(document.body).getPropertyValue('--btn-active-bg').trim(),
+					count: strokes.length,
+					strays: Array.from(new Set(strokes.filter(c => !violet.includes(c)))),
+				};
+			})()
+		`);
+		assert.equal(palette.accent.toLowerCase(), '#b18cf5', "the Violet palette did not move the dark-mode accent onto --root-color");
+		assert.equal(palette.activeBtn.toLowerCase(), '#b18cf5', "the active-button fill did not follow the palette accent");
+		assert.ok(palette.count > 0, "no branch links found to check the palette against");
+		assert.deepEqual(palette.strays, [], "branches kept a non-Violet color after switching palette");
+
+		// Source editor: editing the markdown must rebuild the tree from the same transformer
+		// that produced the file, and a bad source must fail loudly instead of blanking the map.
+		const opened = await session.evalJs(`
+			(function() {
+				window.toggleEditor();
+				return {
+					open: document.getElementById('editor-panel').classList.contains('open'),
+					prefilled: document.getElementById('editor-text').value.length > 0,
+				};
+			})()
+		`);
+		assert.equal(opened.open, true, "the editor panel did not open");
+		assert.equal(opened.prefilled, true, "the editor opened empty instead of prefilled with the current markdown");
+
+		const EDITED = ['# Edited Root', '## Only Pillar', '- **Key**: value', ''].join('\n');
+		await session.evalJs(`document.getElementById('editor-text').value = ${JSON.stringify(EDITED)}; window.applyEditor();`);
+		await sleep(900);
+		const edited = await session.evalJs(`({ labels: Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div')).map(el => el.textContent), levels: document.querySelectorAll('#levels-container button').length })`);
+		assert.ok(edited.labels.includes('Edited Root'), 'the edited markdown did not become the new root: ' + edited.labels.join(' | '));
+		assert.equal(edited.levels, 2, 'the Level buttons did not follow the edited tree\u2019s depth');
+
+		// A source with no heading must be refused, leaving the previous map on screen.
+		await session.evalJs("document.getElementById('editor-text').value = 'no heading at all'; window.applyEditor();");
+		await sleep(400);
+		const refused = await session.evalJs(`({ labels: Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div')).map(el => el.textContent), status: document.getElementById('editor-status').className })`);
+		assert.ok(refused.labels.includes('Edited Root'), 'a source with no heading wiped the map instead of being refused');
+		assert.equal(refused.status, 'error', 'a source with no heading did not report an error');
+
+		await session.evalJs('window.revertEditor()');
+		await sleep(900);
+		const reverted = await session.evalJs(`Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div')).map(el => el.textContent)`);
+		assert.ok(reverted.length > edited.labels.length, 'Revert did not restore the original, larger tree');
+
 		const errors = session.consoleMessages.filter((m) => m.startsWith("[error]") || m.startsWith("[exception]"));
 		assert.equal(errors.length, 0, "console errors during interaction:\n" + errors.join("\n"));
 
-		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, tour/minimap absent, dark mode, PNG export — zero console errors)");
+		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, tour/minimap absent, dark mode, PNG export, Violet palette + accent, source editor apply/refuse/revert — zero console errors)");
 	} finally {
 		if (session) session.ws.close();
 		chrome.kill();
