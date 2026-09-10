@@ -43,9 +43,11 @@ The prior approach asked an LLM to reproduce a ~500-line HTML/CSS/JS template ve
 
 ## What's fixed vs. authored
 
-Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 CDN includes, and all interaction JS (search, dark mode, pitch mode, SVG/PNG export, per-depth expand buttons, the six branch palettes, the in-page source editor, localStorage state).
+Fixed by the template (never author these): the CSS theme variables, the menu layout, the markmap/d3 libraries (inlined by the renderer from `vendor/browser/`, so the file needs no CDN and opens offline or behind a corporate web filter), and all interaction JS (search, dark mode, pitch mode, SVG/PNG export, per-depth expand buttons, the six branch palettes, the in-page source editor, localStorage state).
 
 Authored per document: `source_name`, `generation_date`, and the sanitized `markdown` outline. That's the entire surface area — resist the temptation to touch `templates/strategic-map.template.html` for a one-off document; if the template itself needs a new feature, that's a renderer change, reviewed and tested once, not a per-document improvisation.
+
+Formulas and code blocks are shown as plain text: markmap's KaTeX and highlight.js plugins are disabled because they fetch from a CDN at view time. Don't re-enable them without vendoring their assets.
 
 Guided Tour and the minimap were tried and removed (2026-08-30) — don't re-propose either without reading the Changelog entry on why first.
 

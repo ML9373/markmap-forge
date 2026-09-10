@@ -130,9 +130,7 @@
     #hamburger { display:block; position:fixed; top:20px; right:20px; z-index:110; font-size:16px; padding:8px 12px; }
   }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script src="https://cdn.jsdelivr.net/npm/markmap-lib"></script>
-<script src="https://cdn.jsdelivr.net/npm/markmap-view"></script>
+[INSERT_BROWSER_LIBS]
 </head>
 <body>
 
@@ -214,8 +212,12 @@ const markdown = `
 [INSERT SANITIZED MARKDOWN HIERARCHY HERE]
 `;
 
-const { Markmap, loadCSS, loadJS, Transformer } = window.markmap;
-const transformer = new Transformer();
+const { Markmap, loadCSS, loadJS, Transformer, builtInPlugins } = window.markmap;
+// KaTeX and highlight.js are left out on purpose: markmap fetches their scripts, stylesheets and
+// fonts from cdn.jsdelivr.net at view time, which breaks the no-network guarantee and fails
+// outright behind corporate filters. A formula therefore shows as its source text, and a code
+// block as plain monospace.
+const transformer = new Transformer(builtInPlugins.filter((p) => p.name !== 'katex' && p.name !== 'hljs'));
 const sourceMarkdown = markdown;
 let currentMarkdown = markdown;
 let { root, features } = transformer.transform(markdown);

@@ -8,7 +8,7 @@ This replaces an earlier ad hoc workflow where an LLM was asked to hand-reproduc
 
 *The document above is `examples/example.html`, produced by the CLI from `examples/example.mindmap.json`. Regenerate the screenshot with `npm run capture:preview` so it never drifts from the template.*
 
-Every output is a single self-contained HTML file: no build step, no network fetch at view time, with search, level folding, pitch mode, dark mode, palette/font/size controls, an in-page markdown editor that regenerates the tree, and SVG/PNG export built in.
+Every output is a single self-contained HTML file: no build step, no script fetched at view time (it opens offline and behind corporate web filters), with search, level folding, pitch mode, dark mode, palette/font/size controls, an in-page markdown editor that regenerates the tree, and SVG/PNG export built in.
 
 See [`SKILL.md`](./SKILL.md) for the authoring contract (how an agent should use this).
 
@@ -56,7 +56,11 @@ One self-contained HTML file (no build step, no server) with:
 - **Decorative animated links** — a toggleable subtle flowing dash along branches. Purely visual: unlike archify's flow animation, a mind map's branches are hierarchy, not directional dataflow, so this is honestly decorative, not a flow indicator.
 - **Overlap-safe fitting** — the floating menu panels are fixed overlays with no native collision avoidance against the tree; every "fit" pans the tree clear of them once the fit animation has actually settled, instead of letting a node render (and stay hidden) underneath a panel.
 
-Rendering is powered by [markmap](https://markmap.js.org) + d3, loaded from a CDN inside the generated HTML.
+Rendering is powered by [markmap](https://markmap.js.org) + d3, **inlined** into the generated HTML from pinned copies in `vendor/browser/` (d3 7.9.0, markmap-lib and markmap-view 0.18.12, licences alongside). Up to 0.3.0 they were loaded from cdn.jsdelivr.net, which corporate web filters block: the map then rendered empty. Each file is now ~0.7 MB instead of ~40 KB, the price of working anywhere. The only remaining network request is Google Fonts, and every font stack has a local fallback.
+
+markmap's KaTeX and highlight.js plugins are disabled for the same reason (they fetch scripts, styles and fonts from the CDN at view time): a formula shows as its source text, a code block as plain monospace.
+
+After bumping a library version in `lib/browser-libs.mjs`, regenerate the vendored files with `npm run vendor:browser` (checks each npm tarball's integrity, minifies with esbuild, copies the licence).
 
 **Removed, 2026-08-30**: Guided Tour and the minimap were both ported from archify, then iterated on across several sessions to fix real bugs — but never worked reliably enough to justify the ongoing maintenance cost, so they were cut rather than kept as a half-working feature. See the vault project note's Changelog for the full postmortem.
 
@@ -66,7 +70,7 @@ Rendering is powered by [markmap](https://markmap.js.org) + d3, loaded from a CD
 npm test
 ```
 
-Unit tests cover the validator only. `npm run test:live` additionally renders `examples/example.mindmap.json` and loads it in a real headless Chrome (via raw CDP — no puppeteer dependency) to assert the interactive JS actually works: no node renders underneath the fixed menu panels after a fit, Tour Mode and the minimap are confirmed absent (removed 2026-08-30), and dark-mode/PNG-export both run without console errors. Needs a local Chrome install; skips with a message if none is found.
+Unit tests cover the validator and the renderer (no `<script src>` in the output, libraries inlined in order, `$` sequences in content kept verbatim). `npm run test:live` additionally renders `examples/example.mindmap.json` and loads it in a real headless Chrome (via raw CDP — no puppeteer dependency) to assert the interactive JS actually works: no node renders underneath the fixed menu panels after a fit, Tour Mode and the minimap are confirmed absent (removed 2026-08-30), dark-mode/PNG-export both run without console errors, and the page makes no network request other than web fonts, even when the content holds a formula or a code block. Needs a local Chrome (macOS, Linux or Windows; Edge also works on Windows); skips with a message if none is found.
 
 ## Example
 

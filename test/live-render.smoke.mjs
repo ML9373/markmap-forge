@@ -7,7 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,7 +19,14 @@ const CHROME_CANDIDATES = [
 	"/usr/bin/google-chrome",
 	"/usr/bin/chromium-browser",
 	"/usr/bin/chromium",
+	"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+	"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+	"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
 ];
+
+// Web fonts are the one network fetch the page may make: every font stack has a local
+// fallback, so a blocked request changes the typeface, never whether the map renders.
+const ALLOWED_REMOTE_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
 
 function findChrome() {
 	return CHROME_CANDIDATES.find((p) => existsSync(p));
@@ -31,11 +38,14 @@ class CdpSession {
 		this.id = 0;
 		this.pending = new Map();
 		this.consoleMessages = [];
+		this.requests = [];
 		ws.onmessage = (ev) => {
 			const msg = JSON.parse(ev.data);
 			if (msg.id && this.pending.has(msg.id)) {
 				this.pending.get(msg.id)(msg);
 				this.pending.delete(msg.id);
+			} else if (msg.method === "Network.requestWillBeSent") {
+				this.requests.push(msg.params.request.url);
 			} else if (msg.method === "Runtime.consoleAPICalled") {
 				const args = (msg.params.args || []).map((a) => a.value ?? a.description ?? "").join(" ");
 				this.consoleMessages.push(`[${msg.params.type}] ${args}`);
@@ -115,7 +125,9 @@ async function main() {
 		`--user-data-dir=${profileDir}`,
 		"--no-first-run",
 		...chromeSandboxFlags(),
-		`file://${EXAMPLE_HTML}`,
+		// Start blank and navigate once Network is enabled, so the page's own first requests
+		// are recorded too.
+		"about:blank",
 	], { stdio: ["ignore", "ignore", "pipe"] });
 
 	// Keep Chrome's stderr so a launch failure says why instead of surfacing as a bare
@@ -131,6 +143,8 @@ async function main() {
 		await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
 		session = new CdpSession(ws);
 		await session.send("Runtime.enable");
+		await session.send("Network.enable");
+		await session.send("Page.navigate", { url: pathToFileURL(EXAMPLE_HTML).href });
 		await sleep(2000); // let markmap render + the overlap-safe fit settle
 
 		// The page must load and render without throwing.
@@ -247,10 +261,29 @@ async function main() {
 		const reverted = await session.evalJs(`Array.from(document.querySelectorAll('#markmap g.markmap-node .markmap-foreign > div')).map(el => el.textContent)`);
 		assert.ok(reverted.length > edited.labels.length, 'Revert did not restore the original, larger tree');
 
+		// A formula or a fenced code block used to make markmap pull KaTeX and highlight.js from
+		// cdn.jsdelivr.net. Both plugins are disabled: the content must still show, as plain text.
+		const FEATURES = ['# Features', '## Math', '- formula $E=mc^2$', '## Code', '```js', 'const a = 1;', '```', ''].join('\n');
+		await session.evalJs(`document.getElementById('editor-text').value = ${JSON.stringify(FEATURES)}; window.applyEditor();`);
+		await sleep(1500);
+		const featureText = await session.evalJs(`document.getElementById('markmap').textContent`);
+		assert.ok(featureText.includes('E=mc^2'), 'the formula disappeared instead of showing as text');
+		assert.ok(featureText.includes('const a = 1;'), 'the code block disappeared');
+		await session.evalJs('window.revertEditor()');
+		await sleep(600);
+
+		// The map must render without a single request to a CDN: a blocked host (corporate web
+		// filters do block cdn.jsdelivr.net) would otherwise leave the page empty.
+		const remote = session.requests
+			.filter((u) => /^https?:/i.test(u))
+			.filter((u) => !ALLOWED_REMOTE_HOSTS.has(new URL(u).hostname));
+		assert.deepEqual(remote, [], "the page made network requests outside the web-font allowlist");
+		assert.ok(session.requests.some((u) => u.startsWith("file:")), "request capture recorded nothing, so the check above proves nothing");
+
 		const errors = session.consoleMessages.filter((m) => m.startsWith("[error]") || m.startsWith("[exception]"));
 		assert.equal(errors.length, 0, "console errors during interaction:\n" + errors.join("\n"));
 
-		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, tour/minimap absent, dark mode, PNG export, Violet palette + accent, source editor apply/refuse/revert — zero console errors)");
+		console.log("✔ live-render smoke test passed (page load, overlap-avoidance, tour/minimap absent, dark mode, PNG export, Violet palette + accent, source editor apply/refuse/revert, math/code without CDN, no network beyond web fonts — zero console errors)");
 	} finally {
 		if (session) session.ws.close();
 		chrome.kill();

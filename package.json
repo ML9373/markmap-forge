@@ -15,7 +15,8 @@
     "test:live": "node test/live-render.smoke.mjs",
     "render:example": "node bin/markmap-forge.mjs deliver examples/example.mindmap.json examples/example.html --json",
     "test:unit": "node --test test/*.test.mjs",
-    "capture:preview": "node scripts/capture-preview.mjs"
+    "capture:preview": "node scripts/capture-preview.mjs",
+    "vendor:browser": "node scripts/vendor-browser-libs.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1"
