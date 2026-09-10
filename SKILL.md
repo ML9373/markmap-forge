@@ -3,7 +3,7 @@ name: markmap-forge
 description: Convert a technical document (specs, slides, PDFs, markdown) into ONE standalone interactive HTML5 Strategic Mind Map — a complete knowledge model of the source. Use when the user wants a document turned into an explorable mind map with search, dark mode, pitch mode, and SVG/PNG export instead of a slide deck.
 license: MIT
 metadata:
-  version: "0.3"
+  version: "0.4"
   author: Mouiz Lanikpekoun
   origin: private evolution of the ad hoc "Project HTML Converter" prompt pipeline (SYDRVAULT)
 ---

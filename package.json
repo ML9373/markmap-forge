@@ -1,6 +1,6 @@
 {
   "name": "markmap-forge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Deterministic renderer + validator for the Strategic Mind Map skill: typed JSON in, standalone interactive Markmap HTML5 out.",
   "type": "module",
   "license": "MIT",
